@@ -20,7 +20,12 @@ StudyForge AI will help learners understand, practice, and retain knowledge thro
 
 ## Getting started
 
-The implementation is intentionally not included in this initial foundation. Future work will add the application architecture, development instructions, environment configuration, tests, and deployment workflows.
+The implementation is intentionally not included in this initial foundation. The proposed architecture and phased delivery plan are documented in:
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+
+GitHub Issues are the central work queue. Each implementation phase identifies its responsible agent, acceptance criteria, QA expectations, and independent review gate.
 
 ## License
 
