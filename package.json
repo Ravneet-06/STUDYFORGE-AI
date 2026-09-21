@@ -1,0 +1,18 @@
+{
+  "name": "studyforge-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous multi-agent AI study platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "validate:foundation": "node scripts/validate-foundation.mjs",
+    "health:foundation": "node scripts/validate-foundation.mjs"
+  }
+}

@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+coverage/
+.next/
+.turbo/
+.cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local tooling and generated state
+.azure/
+.supabase/
+.foundry/
+*.log
+*.local
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
