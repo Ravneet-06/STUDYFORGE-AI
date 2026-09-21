@@ -19,3 +19,5 @@
 | `API_PORT`                  | Backend listener                              | No      |
 
 Use managed identity or the supported Azure/Supabase secret store in deployed environments. Never place secret values in source files, frontend bundles, Issues, or logs.
+
+When provider variables are absent, the MVP uses local JSON persistence and deterministic retrieval/generation. It does not invent endpoints, keys, deployments, or model IDs.

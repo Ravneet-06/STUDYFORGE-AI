@@ -12,6 +12,9 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
+    "start": "node apps/api/server.mjs",
+    "dev": "node --watch apps/api/server.mjs",
+    "build": "node scripts/build.mjs",
     "validate:foundation": "node scripts/validate-foundation.mjs",
     "health:foundation": "node scripts/validate-foundation.mjs",
     "format:check": "prettier --check .",

@@ -15,6 +15,7 @@ coverage/
 .azure/
 .supabase/
 .foundry/
+.data/
 *.log
 *.local
 

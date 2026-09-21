@@ -14,7 +14,7 @@
 | AI platform            | Microsoft Foundry and supported `azd` workflows   | Local tooling verified; no resources created |
 | Retrieval              | Provider interface, initially Supabase `pgvector` | Requires the data phase                      |
 
-The foundation deliberately contains no application runtime, framework dependency, database migration, Azure resource, or Supabase resource. Those belong to later Issues.
+The MVP runtime is a dependency-light Node.js HTTP server with a static browser client. It does not create Azure or Supabase resources.
 
 ## Prerequisites
 
@@ -34,6 +34,7 @@ npm run lint
 npm run typecheck
 npm run test:unit
 npm run security:check
+npm run build
 ```
 
 These checks validate the workspace, required documentation, environment template, ignore rules, formatting, JavaScript lint rules, TypeScript configuration, foundation tests, dependency advisories, and obvious committed-secret patterns. They do not contact Azure or Supabase. The unit tests cover foundation invariants only; application behavior will be tested in later phases.
@@ -49,3 +50,13 @@ The project-local Microsoft Foundry skill is stored in `.agents/skills/microsoft
 ## CI scope
 
 The foundation CI workflow installs the lockfile and runs all five quality-check categories. Integration and browser-test jobs will be added with the corresponding application code in later Issues rather than pretending empty workspaces are tested.
+
+## Start the local MVP
+
+```powershell
+npm start
+```
+
+Open `http://localhost:4000`. Local data is stored in `.data/` and is ignored by Git. Upload text or Markdown directly, paste notes, ask grounded questions, and generate study material from matching chunks.
+
+PDF-like text can be pasted or supplied as extracted text in local mode. Production PDF/DOCX extraction, Supabase persistence, and Foundry model generation require the corresponding authorized provider work.

@@ -2,7 +2,7 @@
 
 ## Scope
 
-StudyForge AI is planned as a multi-agent study platform. This document describes the proposed target architecture for the MVP; it does not document implemented application behavior.
+StudyForge AI is planned as a multi-agent study platform. This document describes the target architecture and the implemented local MVP boundaries.
 
 ## System boundaries
 
@@ -23,6 +23,10 @@ Browser
 The browser never calls model or database administration APIs directly. The backend enforces identity, ownership, validation, rate limits, and tool authorization.
 
 ## Runtime components
+
+### Implemented local MVP
+
+The current vertical slice runs from one Node.js HTTP process. It serves the browser UI, exposes the API, stores local development data in `.data/studyforge.json`, and keeps provider boundaries ready for Supabase and Microsoft Foundry. This local adapter is intentionally not a production database or model substitute.
 
 ### Frontend
 
@@ -52,7 +56,7 @@ Retrieval is always filtered by user and document authorization. Responses disti
 
 ### Microsoft Foundry agent layer
 
-Foundry is the primary AI platform. The Orchestrator Agent coordinates bounded tasks and delegates rather than implementing every responsibility. Hosted-agent or prompt-agent choices will follow the installed Foundry skill after the foundation and Azure availability checks; no unsupported API is assumed here.
+Foundry is the primary AI platform. The local MVP uses deterministic generation when `AZURE_AI_PROJECT_ENDPOINT` is absent. No Foundry API call is made without a configured endpoint and authenticated provider implementation. The installed skill remains the source of truth for later Foundry workflows.
 
 Agent handoffs carry a typed task envelope containing task ID, user ID, allowed document scope, requested operation, context references, and output schema. Agents do not receive unrestricted database credentials or arbitrary tools.
 
@@ -91,3 +95,7 @@ Every agent task has a correlation ID and records status, latency, model/deploym
 ## Deployment shape
 
 The MVP should use separate frontend and backend deployables, a worker path for ingestion, Supabase, and a Foundry project. Azure resource creation, model deployment, region, quota, networking, and CI/CD remain gated by the corresponding GitHub Issues and required user authorizations.
+
+## Current agent routing
+
+The local orchestrator routes assistant questions to the RAG Agent, summaries to the Study Agent, MCQs and viva prompts to the Quiz Agent, and progress updates to the Progress Agent. Security/Guardrail checks run at the API boundary. QA is represented by automated vertical-slice tests; MCP is represented by an allowlisted tool-validation adapter.

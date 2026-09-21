@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>StudyForge AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="logo">✦</span>
+          <div><strong>StudyForge</strong><small>AI study command center</small></div>
+        </div>
+        <nav>
+          <button class="nav active" data-view="dashboard">Overview</button
+          ><button class="nav" data-view="assistant">Study assistant</button
+          ><button class="nav" data-view="library">My documents</button
+          ><button class="nav" data-view="quiz">Practice lab</button>
+        </nav>
+        <div class="side-note">
+          <span class="status-dot"></span> Local AI workspace<br /><small
+            >Grounded mode enabled</small
+          >
+        </div>
+      </aside>
+      <main>
+        <header>
+          <div>
+            <p class="eyebrow">MONDAY, SEPTEMBER 21</p>
+            <h1 id="title">Good afternoon, learner.</h1>
+          </div>
+          <div class="avatar">SF</div>
+        </header>
+        <div id="app"></div>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
