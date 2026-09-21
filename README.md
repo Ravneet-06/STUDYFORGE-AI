@@ -24,6 +24,8 @@ The implementation is intentionally not included in this initial foundation. The
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Setup](docs/SETUP.md)
+- [Environment variables](docs/ENVIRONMENT.md)
 
 GitHub Issues are the central work queue. Each implementation phase identifies its responsible agent, acceptance criteria, QA expectations, and independent review gate.
 
