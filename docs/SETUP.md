@@ -2,17 +2,17 @@
 
 ## Selected MVP toolchain
 
-| Area | Foundation choice | Current status |
-|---|---|---|
-| Workspace | npm workspaces on Node.js 22+ | Configured |
-| Frontend | Next.js with TypeScript | Selected for Phase 5 |
-| Backend API | TypeScript service with Fastify | Selected for Phase 2 |
-| Ingestion worker | TypeScript worker process | Selected for Phase 3 |
-| Unit/integration tests | Vitest | Selected for implementation phases |
-| Browser tests | Playwright | Selected for the QA phase |
-| Data and auth | Supabase Auth and Postgres with RLS | Requires a user-authorized project |
-| AI platform | Microsoft Foundry and supported `azd` workflows | Local tooling verified; no resources created |
-| Retrieval | Provider interface, initially Supabase `pgvector` | Requires the data phase |
+| Area                   | Foundation choice                                 | Current status                               |
+| ---------------------- | ------------------------------------------------- | -------------------------------------------- |
+| Workspace              | npm workspaces on Node.js 22+                     | Configured                                   |
+| Frontend               | Next.js with TypeScript                           | Selected for Phase 5                         |
+| Backend API            | TypeScript service with Fastify                   | Selected for Phase 2                         |
+| Ingestion worker       | TypeScript worker process                         | Selected for Phase 3                         |
+| Unit/integration tests | Vitest                                            | Selected for implementation phases           |
+| Browser tests          | Playwright                                        | Selected for the QA phase                    |
+| Data and auth          | Supabase Auth and Postgres with RLS               | Requires a user-authorized project           |
+| AI platform            | Microsoft Foundry and supported `azd` workflows   | Local tooling verified; no resources created |
+| Retrieval              | Provider interface, initially Supabase `pgvector` | Requires the data phase                      |
 
 The foundation deliberately contains no application runtime, framework dependency, database migration, Azure resource, or Supabase resource. Those belong to later Issues.
 
@@ -29,9 +29,14 @@ The foundation deliberately contains no application runtime, framework dependenc
 npm install
 npm run validate:foundation
 npm run health:foundation
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run security:check
 ```
 
-These checks validate the workspace, required documentation, environment template, ignore rules, and obvious committed-secret patterns. They do not contact Azure or Supabase.
+These checks validate the workspace, required documentation, environment template, ignore rules, formatting, JavaScript lint rules, TypeScript configuration, foundation tests, dependency advisories, and obvious committed-secret patterns. They do not contact Azure or Supabase. The unit tests cover foundation invariants only; application behavior will be tested in later phases.
 
 ## Environment setup
 
@@ -43,4 +48,4 @@ The project-local Microsoft Foundry skill is stored in `.agents/skills/microsoft
 
 ## CI scope
 
-The foundation CI workflow installs the lockfile and runs the foundation validator plus dependency auditing. Formatter, linter, TypeScript, unit, integration, and browser-test jobs will be added with the corresponding application code in later Issues rather than pretending empty workspaces are tested.
+The foundation CI workflow installs the lockfile and runs all five quality-check categories. Integration and browser-test jobs will be added with the corresponding application code in later Issues rather than pretending empty workspaces are tested.

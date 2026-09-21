@@ -25,5 +25,13 @@ jobs:
         run: npm ci
       - name: Validate foundation
         run: npm run validate:foundation
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
+      - name: Check formatting
+        run: npm run format:check
+      - name: Run lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Run security checks
+        run: npm run security:check

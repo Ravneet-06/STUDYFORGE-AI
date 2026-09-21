@@ -19,6 +19,11 @@
 ```text
 npm run validate:foundation
 npm run health:foundation
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run security:check
 ```
 
-The foundation currently contains architecture and workspace conventions only. Do not claim an API, frontend, database, agent, or RAG feature exists until its implementation Issue is complete and reviewed.
+The foundation currently contains architecture and workspace conventions only. The current unit tests cover foundation invariants, not product behavior. Do not claim an API, frontend, database, agent, or RAG feature exists until its implementation Issue is complete and reviewed.

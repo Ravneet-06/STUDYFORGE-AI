@@ -15,17 +15,17 @@ This is the initial implementation roadmap for a repository that currently conta
 
 ## Phases
 
-| Phase | Outcome | Primary Issues |
-|---|---|---|
-| 0. Foundation | Runtime boundaries, repository conventions, local configuration, and CI baseline | #1 |
-| 1. Identity and data | Supabase authentication, profiles, schema, migrations, and row-level security | #2 |
-| 2. Backend contract | Validated API boundaries for documents, conversations, study workflows, progress, plans, agents, and health | #3 |
-| 3. Knowledge pipeline | Secure extraction, chunking, embeddings, vector storage, retrieval, provenance, and ingestion status | #4 |
-| 4. Agent and tool layer | Foundry agent roles, orchestration, least-privilege MCP tools, and controlled handoffs | #5 |
-| 5. Study experience | Responsive dashboard, authentication screens, document flows, assistant, generators, plans, progress, and analytics | #6 |
-| 6. Safety and reliability | Prompt-injection defenses, authorization boundaries, safe tool execution, grounding policies, and observability | #7 |
-| 7. QA and evaluation | Automated tests, groundedness/relevance/safety evaluations, regression gates, and failure Issue workflow | #8 |
-| 8. Review and release | Reviewer gate, documentation accuracy, deployment readiness, and MVP acceptance | #9 |
+| Phase                     | Outcome                                                                                                             | Primary Issues |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 0. Foundation             | Runtime boundaries, repository conventions, local configuration, and CI baseline                                    | #1             |
+| 1. Identity and data      | Supabase authentication, profiles, schema, migrations, and row-level security                                       | #2             |
+| 2. Backend contract       | Validated API boundaries for documents, conversations, study workflows, progress, plans, agents, and health         | #3             |
+| 3. Knowledge pipeline     | Secure extraction, chunking, embeddings, vector storage, retrieval, provenance, and ingestion status                | #4             |
+| 4. Agent and tool layer   | Foundry agent roles, orchestration, least-privilege MCP tools, and controlled handoffs                              | #5             |
+| 5. Study experience       | Responsive dashboard, authentication screens, document flows, assistant, generators, plans, progress, and analytics | #6             |
+| 6. Safety and reliability | Prompt-injection defenses, authorization boundaries, safe tool execution, grounding policies, and observability     | #7             |
+| 7. QA and evaluation      | Automated tests, groundedness/relevance/safety evaluations, regression gates, and failure Issue workflow            | #8             |
+| 8. Review and release     | Reviewer gate, documentation accuracy, deployment readiness, and MVP acceptance                                     | #9             |
 
 ## Definition of done for each phase
 
@@ -49,4 +49,3 @@ This is the initial implementation roadmap for a repository that currently conta
 - Public versus private Foundry networking beyond the MVP.
 - The exact embedding/model deployment and region, pending Azure subscription, quota, and model availability checks.
 - Production retention, deletion, and data-residency policies, pending the target deployment environment.
-

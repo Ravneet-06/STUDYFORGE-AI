@@ -62,17 +62,17 @@ MCP tools are explicit, schema-validated capabilities. Initial tool families are
 
 ## Required agents
 
-| Agent | Responsibility | Must not own |
-|---|---|---|
-| Project Manager / Orchestrator | Decompose requirements, route tasks, track Issue state, enforce handoff schemas | Direct unrestricted data or tool access |
-| Frontend | UI composition, client state, accessibility, API integration | Model credentials or database administration |
-| Backend | API contracts, validation, authorization, service composition | Bypassing RLS or direct browser exposure |
-| Database | Schema, migrations, indexes, RLS policies, data lifecycle | Product prompt decisions |
-| RAG | Extraction, chunking, embeddings, retrieval, provenance, grounded context | Cross-user data access |
-| MCP / Tools | Typed tool definitions, adapters, permissions, audit behavior | Generic shell or unrestricted external access |
-| Security / Guardrail | Threat modeling, prompt/content checks, policy enforcement, secrets and abuse controls | Silent weakening of safety checks |
-| QA / Testing | Unit/integration/e2e tests, evaluation datasets, regression and failure Issues | Approving its own untested work |
-| Reviewer | Independent review of requirements, architecture, security, tests, docs, and grounding | Approving incomplete or failing work |
+| Agent                          | Responsibility                                                                         | Must not own                                  |
+| ------------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Project Manager / Orchestrator | Decompose requirements, route tasks, track Issue state, enforce handoff schemas        | Direct unrestricted data or tool access       |
+| Frontend                       | UI composition, client state, accessibility, API integration                           | Model credentials or database administration  |
+| Backend                        | API contracts, validation, authorization, service composition                          | Bypassing RLS or direct browser exposure      |
+| Database                       | Schema, migrations, indexes, RLS policies, data lifecycle                              | Product prompt decisions                      |
+| RAG                            | Extraction, chunking, embeddings, retrieval, provenance, grounded context              | Cross-user data access                        |
+| MCP / Tools                    | Typed tool definitions, adapters, permissions, audit behavior                          | Generic shell or unrestricted external access |
+| Security / Guardrail           | Threat modeling, prompt/content checks, policy enforcement, secrets and abuse controls | Silent weakening of safety checks             |
+| QA / Testing                   | Unit/integration/e2e tests, evaluation datasets, regression and failure Issues         | Approving its own untested work               |
+| Reviewer                       | Independent review of requirements, architecture, security, tests, docs, and grounding | Approving incomplete or failing work          |
 
 ## Security and grounding controls
 
@@ -91,4 +91,3 @@ Every agent task has a correlation ID and records status, latency, model/deploym
 ## Deployment shape
 
 The MVP should use separate frontend and backend deployables, a worker path for ingestion, Supabase, and a Foundry project. Azure resource creation, model deployment, region, quota, networking, and CI/CD remain gated by the corresponding GitHub Issues and required user authorizations.
-
