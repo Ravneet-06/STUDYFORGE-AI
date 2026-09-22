@@ -33,5 +33,7 @@ jobs:
         run: npm run typecheck
       - name: Run unit tests
         run: npm run test:unit
+      - name: Run deterministic evaluation suite
+        run: npm run evaluate:local
       - name: Run security checks
         run: npm run security:check

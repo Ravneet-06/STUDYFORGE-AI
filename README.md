@@ -26,6 +26,8 @@ The architecture and delivery plan are documented in:
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Setup](docs/SETUP.md)
 - [Environment variables](docs/ENVIRONMENT.md)
+- [Security architecture](docs/SECURITY.md)
+- [QA and evaluation strategy](docs/QA.md)
 
 GitHub Issues are the central work queue. Each implementation phase identifies its responsible agent, acceptance criteria, QA expectations, and independent review gate.
 
@@ -36,7 +38,9 @@ npm install
 npm start
 ```
 
-Open `http://localhost:4000`. Local mode persists development data under `.data/` and does not require Azure or Supabase credentials. Configure `AZURE_AI_PROJECT_ENDPOINT` or `SUPABASE_URL` only when authorized services are available; the application reports their availability without fabricating credentials.
+Open `http://localhost:4000`. Local mode persists development data under `.data/` and does not require Azure or Supabase credentials. Configure both `SUPABASE_URL` and `SUPABASE_ANON_KEY`, or `AZURE_AI_PROJECT_ENDPOINT`, only when authorized services are available; the application reports their availability without fabricating credentials. Without Supabase values, local JSON mode remains available. The frontend includes the complete dashboard, library, grounded assistant, practice lab, study plans, progress, and local/provider status workflows.
+
+Hosted Foundry is currently blocked by zero GPT deployment quota in the Azure for Students subscription; see [environment notes](docs/ENVIRONMENT.md).
 
 ## License
 

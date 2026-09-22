@@ -1,6 +1,7 @@
 .agents/
 .git/
 node_modules/
+supabase/.temp/
 coverage/
 dist/
 build/

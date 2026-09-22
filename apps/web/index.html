@@ -3,37 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>StudyForge AI</title>
+    <meta name="description" content="StudyForge is your grounded AI study workspace." />
+    <title>StudyForge AI — Study with confidence</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand">
+        <a class="brand" href="#dashboard" data-view="dashboard">
           <span class="logo">✦</span>
-          <div><strong>StudyForge</strong><small>AI study command center</small></div>
-        </div>
-        <nav>
-          <button class="nav active" data-view="dashboard">Overview</button
-          ><button class="nav" data-view="assistant">Study assistant</button
-          ><button class="nav" data-view="library">My documents</button
-          ><button class="nav" data-view="quiz">Practice lab</button>
+          <span><strong>StudyForge</strong><small>AI study workspace</small></span>
+        </a>
+        <nav aria-label="Primary navigation">
+          <button class="nav active" data-view="dashboard"><span>⌂</span> Overview</button>
+          <button class="nav" data-view="assistant"><span>✧</span> Ask StudyForge</button>
+          <button class="nav" data-view="library"><span>▱</span> My library</button>
+          <button class="nav" data-view="practice"><span>◎</span> Practice lab</button>
+          <button class="nav" data-view="plans"><span>◷</span> Study plans</button>
         </nav>
         <div class="side-note">
-          <span class="status-dot"></span> Local AI workspace<br /><small
-            >Grounded mode enabled</small
-          >
+          <span class="status-dot"></span><strong id="mode-label">Local workspace</strong>
+          <small id="mode-detail">Your data stays in this development workspace.</small>
         </div>
       </aside>
       <main>
         <header>
           <div>
-            <p class="eyebrow">MONDAY, SEPTEMBER 21</p>
+            <p class="eyebrow" id="date-label">YOUR STUDY WORKSPACE</p>
             <h1 id="title">Good afternoon, learner.</h1>
           </div>
-          <div class="avatar">SF</div>
+          <div class="header-actions">
+            <button class="icon-button" data-view="assistant" aria-label="Ask a question">?</button>
+            <div class="avatar" aria-label="StudyForge user">SF</div>
+          </div>
         </header>
-        <div id="app"></div>
+        <div id="app" aria-live="polite"></div>
       </main>
     </div>
     <script type="module" src="/app.js"></script>

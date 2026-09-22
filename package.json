@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "evaluate:local": "node scripts/evaluate-local.mjs",
     "security:check": "npm audit --audit-level=high && node scripts/validate-foundation.mjs"
   },
   "devDependencies": {
@@ -31,5 +32,9 @@
     "prettier": "3.9.8",
     "typescript": "7.0.2",
     "vitest": "5.0.1"
+  },
+  "dependencies": {
+    "mammoth": "^1.12.3",
+    "pdf-parse": "^2.4.5"
   }
 }

@@ -20,7 +20,7 @@ Browser
       -> Telemetry and evaluation store
 ```
 
-The browser never calls model or database administration APIs directly. The backend enforces identity, ownership, validation, rate limits, and tool authorization.
+The browser never calls model or database administration APIs directly. The backend enforces identity, ownership, validation, request-size limits, and tool authorization. Edge rate limiting remains a production deployment requirement.
 
 ## Runtime components
 
@@ -34,7 +34,9 @@ The web client owns navigation, accessible forms, upload progress, assistant con
 
 ### Backend API
 
-The API is organized by bounded modules: authentication/session, documents, ingestion, retrieval/conversations, generation, quizzes, progress, study plans, agent operations, evaluations, and health. It is the policy enforcement point for authentication, authorization, input validation, ownership checks, and audit events.
+The API is organized by bounded modules: authentication/session, documents, ingestion, retrieval/conversations, generation, quizzes, progress, study plans, agent operations, evaluations, and health. It is the policy enforcement point for authentication, authorization, input validation, ownership checks, and audit events. The local MVP implements these contracts in one Node.js HTTP process; it does not claim a separate production worker or service deployment.
+
+The implemented contract is available under `/api/v1` (with legacy `/api` aliases retained for the local MVP). Responses include an `x-request-id` correlation header and request ID field. Errors use `{ error: { code, message }, requestId }`; resource routes return not-found rather than exposing another user's records. Supabase mode requires a bearer token and forwards that token to PostgREST so database RLS remains authoritative. Local mode uses the existing development identity header and JSON adapter.
 
 ### Data layer
 
@@ -62,7 +64,7 @@ Agent handoffs carry a typed task envelope containing task ID, user ID, allowed 
 
 ### MCP/tool gateway
 
-MCP tools are explicit, schema-validated capabilities. Initial tool families are study-document operations, project-management/GitHub operations, database read/write operations through approved service methods, and evaluation operations. Each tool has an allowlist, ownership checks, input limits, audit logging, and a timeout. Destructive or privileged operations require a separate policy decision and are not exposed by default.
+MCP tools are explicit, schema-validated capabilities. The implemented local allowlist contains only `list_documents`, `get_document_chunks`, and `record_progress`, all scoped to the authenticated user. Project-management/GitHub, general database administration, evaluation, destructive, and privileged tool families are planned boundaries only and are not exposed by this MVP. Implemented tools have ownership checks, input limits, and audit logging; execution timeouts and edge rate limiting remain production follow-up requirements.
 
 ## Required agents
 
@@ -83,7 +85,7 @@ MCP tools are explicit, schema-validated capabilities. Initial tool families are
 - Supabase Auth plus RLS and backend ownership checks isolate users.
 - Secrets use environment variables, managed identity, or platform secret stores.
 - Uploaded content is treated as untrusted data and cannot redefine system policy or tool permissions.
-- Tool calls use least privilege, strict schemas, timeouts, rate limits, and audit events.
+- Tool calls use least privilege, strict schemas, ownership checks, and audit events. Timeouts and rate limits remain deployment-level follow-up controls.
 - Retrieval filters by user/document scope before generation.
 - Generated answers include only verifiable document provenance; unsupported claims are explicitly marked.
 - Safety, privacy, prompt-injection, cross-tenant, and citation tests are release gates.
@@ -98,4 +100,4 @@ The MVP should use separate frontend and backend deployables, a worker path for 
 
 ## Current agent routing
 
-The local orchestrator routes assistant questions to the RAG Agent, summaries to the Study Agent, MCQs and viva prompts to the Quiz Agent, and progress updates to the Progress Agent. Security/Guardrail checks run at the API boundary. QA is represented by automated vertical-slice tests; MCP is represented by an allowlisted tool-validation adapter.
+The local orchestrator routes requests through the RAG/Research, Study, or Quiz specialist as needed, then applies Reviewer and QA checks before returning a structured response. The Foundry provider boundary is explicit: hosted invocation requires authorized project configuration and is never simulated. Security/Guardrail checks run at the API boundary. MCP exposes only authenticated, schema-validated document and progress tools; unknown or privileged tools are denied by default.

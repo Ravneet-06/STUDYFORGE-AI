@@ -33,15 +33,18 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm run test:unit
+npm run evaluate:local
 npm run security:check
 npm run build
 ```
 
-These checks validate the workspace, required documentation, environment template, ignore rules, formatting, JavaScript lint rules, TypeScript configuration, foundation tests, dependency advisories, and obvious committed-secret patterns. They do not contact Azure or Supabase. The unit tests cover foundation invariants only; application behavior will be tested in later phases.
+These checks validate the workspace, required documentation, environment template, ignore rules, formatting, JavaScript lint rules, TypeScript configuration, application behavior, dependency advisories, deterministic RAG/security evaluations, and obvious committed-secret patterns. They do not contact Azure or Supabase.
 
 ## Environment setup
 
 Copy `.env.example` to `.env.local` only when a later phase needs local service configuration. `.env.local` and all other `.env.*` files except `.env.example` are ignored by Git. Never put service-role keys or model credentials in browser code, Issues, logs, or committed files.
+
+To enable the Supabase path, configure both `SUPABASE_URL` and `SUPABASE_ANON_KEY` in a local, ignored environment file. The API validates the Authorization bearer header with Supabase Auth and forwards the same user token to PostgREST, where the migrations' RLS policies enforce ownership. No Supabase project is created or contacted until these values are supplied.
 
 ## Foundry setup
 
