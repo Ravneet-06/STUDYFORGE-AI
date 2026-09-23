@@ -13,6 +13,7 @@
 | `AZURE_TENANT_ID`                   | Azure authentication                          | No      |
 | `AZURE_RESOURCE_GROUP`              | Azure resource workflows                      | No      |
 | `AZURE_AI_PROJECT_ENDPOINT`         | Foundry project operations                    | No      |
+| `AZURE_AI_AGENT_NAME`               | Foundry agent reference                       | No      |
 | `AZURE_OPENAI_ENDPOINT`             | Model client configuration, if selected       | No      |
 | `AZURE_OPENAI_API_KEY`              | Server-side model authentication, if selected | **Yes** |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Azure OpenAI embedding deployment name        | No      |
@@ -29,3 +30,9 @@ When all three embedding variables (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_K
 ## Hosted Foundry availability
 
 The Azure for Students subscription was checked on 2026-09-22. Azure CLI authentication, the existing subscription, the `eastus` region, and resource-group permissions were available, but the subscription reported zero quota for the suitable GPT deployments. No Foundry account, project, model deployment, endpoint, or credential was created. The local frontend therefore identifies the active provider honestly as **Local fallback mode** until quota is explicitly granted and an authorized hosted deployment is configured.
+
+## Microsoft Foundry agent integration
+
+Set `AZURE_AI_PROJECT_ENDPOINT` to the project endpoint shown in the Microsoft Foundry project overview, for example `https://<resource>.services.ai.azure.com/api/projects/<project>`. Set `AZURE_AI_AGENT_NAME` to the published agent identifier; the configured StudyForge agent is `StudyForge-Study-Agent`. The backend uses the `@azure/ai-projects` v1 data-plane client and `DefaultAzureCredential` with Microsoft Entra ID. Use `az login` locally or the application's managed identity in Azure. No Foundry endpoint, credential, or token is sent to the browser.
+
+When both values are present, assistant, summary, explanation, MCQ, and viva requests use the agent through the authenticated Foundry Responses API with an `agent_reference`. Progress remains local. If either value is absent, the existing local RAG and lexical/pgvector fallback remains active. Foundry source annotations are preserved when returned; responses without supported grounding are rejected by the existing reviewer and guardrails rather than treated as successful answers.

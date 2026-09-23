@@ -127,14 +127,54 @@ export function runQaAgent(result, review) {
   return { passed: failures.length === 0, failures };
 }
 
-export async function orchestrate(kind, input, store) {
+export async function orchestrate(kind, input, store, options = {}) {
   const route = routes[kind] ? kind : "assistant";
-  const provider = createFoundryProvider();
+  const provider = options.provider || createFoundryProvider();
   const selected = selectAgents(route);
   let result;
   let research = { context: [], sources: [], grounded: false };
   if (selected.includes("rag")) research = await runRagAgent(input, store);
-  if (route === "assistant") {
+  if (provider.configured && route !== "progress") {
+    const generated = await provider.run({
+      message: [
+        "You are the StudyForge study-only agent. Answer only academic study questions.",
+        "Use the connected knowledge base for grounding. If the material does not support the question, say so.",
+        `Requested operation: ${route}.`,
+        ...(route === "mcq" || route === "viva"
+          ? [
+              'Return only valid JSON in the shape {"questions":[{"question":"...","options":["..."],"answer":"..."}]}.',
+            ]
+          : []),
+        `User request: ${input.question || input.topic || ""}`,
+      ].join("\n"),
+    });
+    if (route === "assistant") {
+      result = {
+        answer: generated.answer,
+        grounded: generated.sources.length > 0,
+        sources: generated.sources,
+      };
+    } else if (route === "summary" || route === "explanation") {
+      result = {
+        summary: generated.answer,
+        grounded: generated.sources.length > 0,
+        sources: generated.sources,
+      };
+    } else {
+      let questions;
+      try {
+        const parsed = JSON.parse(generated.answer);
+        questions = Array.isArray(parsed) ? parsed : parsed.questions;
+      } catch {
+        questions = null;
+      }
+      result = {
+        questions: Array.isArray(questions) ? questions : [],
+        grounded: generated.sources.length > 0,
+        sources: generated.sources,
+      };
+    }
+  } else if (route === "assistant") {
     result = { ...groundedAnswer(input.question, research.context), sources: research.sources };
   } else if (route === "summary" || route === "explanation") {
     result = runStudyAgent(input, research);

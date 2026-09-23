@@ -72,6 +72,67 @@ describe("multi-agent orchestration and MCP", () => {
     });
   });
 
+  it("calls the Foundry Responses API through the provider boundary and preserves citations", async () => {
+    const create = async (...args) => {
+      expect(args[0]).toEqual({ input: "Explain networking." });
+      expect(args[1]).toEqual({
+        body: {
+          agent_reference: { name: "StudyForge-Study-Agent", type: "agent_reference" },
+        },
+      });
+      return {
+        id: "response-1",
+        output_text: "Networking connects devices.",
+        output: [
+          {
+            content: [
+              {
+                annotations: [
+                  { file_id: "source-1", chunk_id: "chunk-1", quote: "Networks connect devices." },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    };
+    const provider = createFoundryProvider(
+      {
+        endpoint: "https://example.services.ai.azure.com/api/projects/studyforge",
+        agentName: "StudyForge-Study-Agent",
+      },
+      { client: { responses: { create } } },
+    );
+    await expect(provider.run({ message: "Explain networking." })).resolves.toMatchObject({
+      answer: "Networking connects devices.",
+      responseId: "response-1",
+      sources: [{ documentId: "source-1", chunkId: "chunk-1" }],
+    });
+  });
+
+  it("uses the configured provider while retaining the reviewer and QA boundary", async () => {
+    const provider = {
+      mode: "foundry",
+      configured: true,
+      async run() {
+        return {
+          answer: "Networks connect devices.",
+          sources: [{ documentId: "source-1", chunkId: "chunk-1" }],
+        };
+      },
+    };
+    const result = await orchestrate(
+      "assistant",
+      { userId: "user-1", question: "Explain networking." },
+      store,
+      { provider },
+    );
+    expect(result.provider).toBe("foundry");
+    expect(result.answer).toBe("Networks connect devices.");
+    expect(result.reviewer.approved).toBe(true);
+    expect(result.qa.passed).toBe(true);
+  });
+
   it("denies unknown or malformed tools and executes only authenticated allowlisted tools", async () => {
     expect(validateToolInput({ tool: "shell", command: "dir" }).allowed).toBe(false);
     expect(validateToolInput({ tool: "record_progress" }).allowed).toBe(false);

@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "test:foundry:live": "vitest run tests/foundry.live.test.mjs",
     "evaluate:local": "node scripts/evaluate-local.mjs",
     "security:check": "npm audit --audit-level=high && node scripts/validate-foundation.mjs"
   },
@@ -34,6 +35,8 @@
     "vitest": "5.0.1"
   },
   "dependencies": {
+    "@azure/ai-projects": "^2.7.0",
+    "@azure/identity": "^4.13.3",
     "mammoth": "^1.12.3",
     "pdf-parse": "^2.4.5"
   }

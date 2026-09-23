@@ -6,6 +6,7 @@ import { orchestrate } from "./agents.mjs";
 import { executeTool, listTools, validateToolInput } from "./mcp.mjs";
 import { guardInput } from "./guardrails.mjs";
 import { authenticateRequest, createSupabaseStore, getSupabaseConfig } from "./supabase.mjs";
+import { getFoundryConfig } from "./foundry.mjs";
 import { ApiError, requireEnum, requireId, requireString, requestId } from "./contracts.mjs";
 import { logEvent, safeError } from "./observability.mjs";
 
@@ -102,7 +103,7 @@ async function api(req, res, url, localStore, supabase, correlationId) {
       {
         status: "ok",
         mode: supabase ? "supabase" : "local",
-        foundry: Boolean(process.env.AZURE_AI_PROJECT_ENDPOINT),
+        foundry: Boolean(getFoundryConfig()),
         supabase: Boolean(supabase),
         requestId: correlationId,
       },
