@@ -75,7 +75,7 @@ export function createApp({ staticRoot }) {
           correlationId,
         );
       }
-      return serveStatic(res, staticRoot, url.pathname);
+      return serveStatic(res, staticRoot, url.pathname, correlationId);
     } catch (error) {
       const safe = safeError(error);
       logEvent("api.error", { requestId: correlationId, status: safe.status, code: safe.code });
@@ -311,11 +311,16 @@ async function api(req, res, url, localStore, supabase, correlationId) {
   throw new ApiError(404, "not_found", "Route not found.");
 }
 
-async function serveStatic(res, root, pathname) {
+async function serveStatic(res, root, pathname, correlationId) {
   const requested = pathname === "/" ? "/index.html" : pathname;
   const file = normalize(join(root, requested));
   if (!file.startsWith(normalize(root)))
-    return json(res, 403, { error: { code: "forbidden", message: "Forbidden." } });
+    return json(
+      res,
+      403,
+      { error: { code: "forbidden", message: "Forbidden." } },
+      correlationId,
+    );
   try {
     const data = await readFile(file);
     const types = {
@@ -329,6 +334,6 @@ async function serveStatic(res, root, pathname) {
     });
     res.end(data);
   } catch {
-    json(res, 404, { error: { code: "not_found", message: "Not found." } });
+    json(res, 404, { error: { code: "not_found", message: "Not found." } }, correlationId);
   }
 }
