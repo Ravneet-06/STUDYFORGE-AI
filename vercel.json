@@ -1,10 +1,5 @@
 {
-  "version": 2,
-  "functions": {
-    "api/index.mjs": {
-      "runtime": "nodejs22.x"
-    }
-  },
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
       "source": "/(.*)",
