@@ -16,11 +16,13 @@ RLS policies cover user-owned tables, document chunks are checked against their 
 
 `apps/api/src/guardrails.mjs` provides reusable prompt-injection detection, metadata sanitization, tool argument validation, context/output limits, grounding enforcement, and sensitive-data leakage checks. Dangerous or unknown tools are denied by default. Generated study answers must have source document/chunk identifiers; otherwise the reviewer/QA path marks them unsupported.
 
-Document ingestion supports only PDF, DOCX, Markdown, and text, with a 1.5 MB extracted-input limit. Context is capped before generation and provider retrieval results are re-filtered by user and document ID. Source excerpts are bounded and are never invented.
+Document ingestion supports only PDF, DOCX, Markdown, and text, with an 8 MB extracted-input limit and a 12 MB JSON request limit to accommodate base64-encoded browser uploads. Both limits are enforced server-side and return a safe `413 payload_too_large` error. Context is capped before generation and provider retrieval results are re-filtered by user and document ID. Source excerpts are bounded and are never invented.
+
+Progress and score values are server-derived. MCQ submissions contain selected option indexes; the API loads the caller-owned quiz and calculates the score from stored answers. Client-supplied score, percentage, points, and completion values are ignored or rejected. Public activity and MCP paths cannot record MCQ or Viva attempts. Points, cumulative completion, active days, averages, and weekly sessions are computed on the server. Viva answers are evaluated deterministically against bounded reference answers, and a non-empty answer never receives automatic full credit.
 
 ## MCP/tool security
 
-The tool gateway exposes only the explicit `list_documents`, `get_document_chunks`, and `record_progress` allowlist. Unknown tools, extra arguments, invalid IDs, malformed progress, missing stores, and missing identities are rejected. No shell, network, filesystem, administrative, or cross-user capability is exposed. Tool errors use safe API messages and do not include credentials or internal stack traces.
+The tool gateway exposes only the explicit `list_documents`, `get_document_chunks`, `record_progress`, and `record_activity` allowlist. `record_progress` can update the study focus note but not server-derived completion. `record_activity` cannot forge assessment attempts. Unknown tools, extra arguments, invalid IDs, malformed progress, missing stores, and missing identities are rejected. No shell, network, filesystem, administrative, or cross-user capability is exposed. Tool errors use safe API messages and do not include credentials or internal stack traces.
 
 ## Secrets and configuration
 
@@ -28,7 +30,7 @@ Secrets must come from environment variables or a managed secret store. `.env` f
 
 ## HTTP hardening and observability
 
-Responses use request IDs, `nosniff`, clickjacking protection, no-referrer, no-store, and a restrictive content-security policy. CORS is unset by default and can be narrowed to `WEB_ORIGIN`; wildcard CORS is not used. JSON bodies are limited to 2 MB and preflight methods/headers are explicit.
+Responses use request IDs, `nosniff`, clickjacking protection, no-referrer, no-store, and a restrictive content-security policy. CORS is unset by default and can be narrowed to `WEB_ORIGIN`; wildcard CORS is not used. JSON bodies are limited to 12 MB and preflight methods/headers are explicit.
 
 Structured events cover authentication failures, API errors, guardrail decisions, document ingestion, retrieval authorization/completion, agent completion, and tool denial/completion. Events contain IDs, counts, status, and policy outcomes, not passwords, tokens, full documents, prompts, or answers. Correlation IDs are returned as `x-request-id`.
 

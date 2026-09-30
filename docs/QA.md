@@ -11,6 +11,7 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm run test:unit
+npm run test:e2e
 npm run evaluate:local
 npm run security:check
 npm run validate:foundation
@@ -27,7 +28,10 @@ git diff --check
 - document ingestion, metadata normalization, listing, and ownership;
 - grounded answers, source attribution, unsupported-question refusal, retrieval relevance, and tenant isolation;
 - summary, explanation, MCQ, viva, study-plan, and progress workflows;
+- assessed Viva evaluation, cumulative progress, active-day metrics, and activity recording;
 - MCP allowlisting, malformed arguments, prompt injection, sensitive output, malformed JSON, and oversized requests.
+
+The Vitest suite also contains a deterministic end-to-end regression (`npm run test:e2e`) that walks the full student journey: authentication, dashboard data, document upload, library listing, grounded answer with evidence, unsupported refusal, summary, explanation, MCQ generation, quiz persistence, attempt scoring, progress update, Viva generation, Viva evaluation, progress update, study plan, persistence after refresh, document deletion, and the empty state.
 
 Groundedness is measured deterministically: a supported response must be marked grounded and include document/chunk provenance; unsupported questions must be explicitly ungrounded with no sources. Retrieval relevance uses synthetic lexical matches and verifies that another user's chunk is excluded. These are behavioral regression checks, not claims about general model quality.
 

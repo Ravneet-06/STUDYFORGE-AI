@@ -131,10 +131,12 @@ addCase("study-plan-and-progress", "student-workflow", true, async () => {
   const progress = await call("/api/progress", {
     method: "POST",
     headers: { "x-studyforge-user": "evaluation-owner" },
-    body: JSON.stringify({ completed: 40, streak: 2, hours: 1 }),
+    body: JSON.stringify({ plan: "Review cells", hours: 1 }),
   });
   assert(
-    plan.response.status === 201 && progress.body.progress.completed === 40,
+    plan.response.status === 201 &&
+      progress.response.status === 200 &&
+      progress.body.progress.plan === "Review cells",
     "plan/progress workflow failed",
   );
 });
@@ -158,9 +160,60 @@ addCase("quiz-and-attempt-workflow", "student-workflow", true, async () => {
   const attempt = await call(`/api/quizzes/${quiz.body.quiz.id}/attempts`, {
     method: "POST",
     headers: { "x-studyforge-user": "evaluation-owner" },
-    body: JSON.stringify({ score: 100, answers: { 0: "Mitochondria" } }),
+    body: JSON.stringify({ score: 0, answers: { 0: "0" } }),
   });
   assert(attempt.response.status === 201, "quiz attempt failed");
+});
+
+addCase("viva-evaluation-and-progress", "student-workflow", true, async () => {
+  const evaluation = await call("/api/viva/evaluate", {
+    method: "POST",
+    headers: { "x-studyforge-user": "evaluation-owner" },
+    body: JSON.stringify({
+      questions: [
+        {
+          question: "Explain respiration.",
+          answer: "Mitochondria produce energy through respiration.",
+        },
+        {
+          question: "Explain photosynthesis.",
+          answer: "Chloroplasts convert light into chemical energy.",
+        },
+      ],
+      answers: ["Mitochondria produce energy through respiration", "I am not sure"],
+    }),
+  });
+  assert(evaluation.response.status === 200, "viva evaluation failed");
+  assert(
+    evaluation.body.evaluation.results[0].verdict === "correct",
+    "viva correct verdict failed",
+  );
+  assert(
+    evaluation.body.evaluation.results[1].verdict === "incorrect",
+    "viva incorrect verdict failed",
+  );
+  assert(evaluation.body.evaluation.results[0].explanation, "viva explanation missing");
+  assert(evaluation.body.progress.vivaAttempts >= 1, "viva activity was not recorded");
+});
+
+addCase("progress-cumulative-metrics", "student-workflow", true, async () => {
+  const before = await call("/api/progress", {
+    headers: { "x-studyforge-user": "evaluation-owner" },
+  });
+  const patched = await call("/api/progress", {
+    method: "POST",
+    headers: { "x-studyforge-user": "evaluation-owner" },
+    body: JSON.stringify({ completed: 30 }),
+  });
+  assert(patched.response.status === 422, "client-claimed completion was accepted");
+  const after = await call("/api/progress", {
+    headers: { "x-studyforge-user": "evaluation-owner" },
+  });
+  assert(
+    after.body.progress.completed === before.body.progress.completed,
+    "client changed completion",
+  );
+  assert(after.body.progress.quizAttempts >= 1, "MCQ activity was not recorded");
 });
 
 addCase("idor-and-retrieval-isolation", "authorization", true, async () => {
@@ -262,18 +315,30 @@ addCase("malformed-and-oversized-api-input", "api-errors", true, async () => {
     headers: { "x-studyforge-user": "evaluation-owner" },
     body: "{",
   });
-  const oversized = await call("/api/documents", {
+  // The API intentionally allows a 12 MB JSON envelope (base64 browser uploads) while the
+  // decoded document content keeps its own 8 MB limit. Exercise both real policy boundaries.
+  const oversizedBody = await call("/api/documents", {
     method: "POST",
     headers: { "x-studyforge-user": "evaluation-owner" },
-    body: JSON.stringify({ title: "large", content: "x".repeat(2_100_000) }),
+    body: JSON.stringify({ title: "large", content: "x".repeat(12_100_000) }),
+  });
+  const oversizedDocument = await call("/api/documents", {
+    method: "POST",
+    headers: { "x-studyforge-user": "evaluation-owner" },
+    body: JSON.stringify({ title: "document-limit", content: "y".repeat(8_100_000) }),
   });
   assert(
     malformed.response.status === 400 && malformed.body.error.code === "invalid_json",
     "malformed request handling failed",
   );
   assert(
-    oversized.response.status === 413 && oversized.body.error.code === "payload_too_large",
-    "oversized request handling failed",
+    oversizedBody.response.status === 413 && oversizedBody.body.error.code === "payload_too_large",
+    "oversized request envelope handling failed",
+  );
+  assert(
+    oversizedDocument.response.status === 413 &&
+      oversizedDocument.body.error.code === "payload_too_large",
+    "oversized document content handling failed",
   );
 });
 

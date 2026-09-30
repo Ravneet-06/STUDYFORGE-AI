@@ -13,7 +13,7 @@
   },
   "scripts": {
     "start": "node apps/api/server.mjs",
-    "dev": "node --watch apps/api/server.mjs",
+    "dev": "node --env-file=.env.local --watch apps/api/server.mjs",
     "build": "node scripts/build.mjs",
     "validate:foundation": "node scripts/validate-foundation.mjs",
     "health:foundation": "node scripts/validate-foundation.mjs",
@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "test:e2e": "vitest run tests/e2e.test.mjs",
     "test:foundry:live": "vitest run tests/foundry.live.test.mjs",
     "evaluate:local": "node scripts/evaluate-local.mjs",
     "security:check": "npm audit --audit-level=high && node scripts/validate-foundation.mjs"

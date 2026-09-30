@@ -10,7 +10,7 @@ export const LIMITS = Object.freeze({
   question: 1200,
   topic: 400,
   title: 200,
-  documentBytes: 1_500_000,
+  documentBytes: 8_000_000,
   outputChars: 12_000,
   contextChars: 8_000,
 });

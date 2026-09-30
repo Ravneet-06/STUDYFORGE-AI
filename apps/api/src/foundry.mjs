@@ -8,6 +8,16 @@ export class FoundryNotConfiguredError extends Error {
   }
 }
 
+export class FoundryProviderError extends Error {
+  constructor() {
+    super("Microsoft Foundry could not complete this request. Try again shortly.");
+    this.name = "FoundryProviderError";
+    this.code = "foundry_unavailable";
+    this.status = 502;
+    this.publicMessage = this.message;
+  }
+}
+
 export function getFoundryConfig(env = process.env) {
   const endpoint = env.AZURE_AI_PROJECT_ENDPOINT?.trim();
   const agentName = env.AZURE_AI_AGENT_NAME?.trim();
@@ -75,22 +85,26 @@ export function createFoundryProvider(config = getFoundryConfig(), dependencies 
     endpoint: config.endpoint,
     agentName: config.agentName,
     async run(input) {
-      const client = dependencies.client || (await createClient(config));
-      const response = await client.responses.create(
-        { input: input.message },
-        {
-          body: {
-            agent_reference: { name: config.agentName, type: "agent_reference" },
+      try {
+        const client = dependencies.client || (await createClient(config));
+        const response = await client.responses.create(
+          { input: input.message },
+          {
+            body: {
+              agent_reference: { name: config.agentName, type: "agent_reference" },
+            },
           },
-        },
-      );
-      const answer = responseText(response);
-      if (!answer) throw new Error("Microsoft Foundry returned an empty response.");
-      return {
-        answer,
-        sources: responseSources(response),
-        responseId: response.id,
-      };
+        );
+        const answer = responseText(response);
+        if (!answer) throw new Error("Microsoft Foundry returned an empty response.");
+        return {
+          answer,
+          sources: responseSources(response),
+          responseId: response.id,
+        };
+      } catch {
+        throw new FoundryProviderError();
+      }
     },
   };
 }

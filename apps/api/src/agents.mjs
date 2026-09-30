@@ -4,6 +4,16 @@ import { agentRoles, handoff } from "./agent-contracts.mjs";
 import { createFoundryProvider } from "./foundry.mjs";
 import { logEvent } from "./observability.mjs";
 
+const foundryCitation = /【\d+:\d+†[^】]*】/g;
+const sourceGroupCitation = /【\s*Source\s+\d+(?:\s*\|\s*Source\s+\d+)*\s*】/gi;
+
+function cleanGeneratedAnswer(answer) {
+  return String(answer || "")
+    .replace(foundryCitation, "")
+    .replace(sourceGroupCitation, "")
+    .trim();
+}
+
 const routes = Object.freeze({
   assistant: ["rag", "reviewer", "qa"],
   summary: ["rag", "study", "reviewer", "qa"],
@@ -43,23 +53,162 @@ export async function runRagAgent(input, store) {
   };
 }
 
-function makeQuestions(context, count) {
-  const sentences = context
+const stopwords = new Set([
+  "about",
+  "above",
+  "after",
+  "again",
+  "against",
+  "along",
+  "also",
+  "because",
+  "been",
+  "before",
+  "being",
+  "below",
+  "between",
+  "both",
+  "cannot",
+  "could",
+  "does",
+  "doing",
+  "during",
+  "each",
+  "from",
+  "further",
+  "have",
+  "having",
+  "here",
+  "into",
+  "itself",
+  "more",
+  "most",
+  "only",
+  "other",
+  "over",
+  "same",
+  "should",
+  "some",
+  "such",
+  "than",
+  "that",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "those",
+  "through",
+  "under",
+  "until",
+  "very",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "with",
+  "would",
+  "your",
+]);
+
+const genericDistractors = [
+  "An unrelated concept from another topic",
+  "An incorrect assumption not supported by the material",
+  "A different process described elsewhere in the material",
+];
+
+const insufficientEvidence = "There is not enough evidence in the source";
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function keyTerms(text) {
+  return [
+    ...new Set(
+      (
+        String(text)
+          .toLowerCase()
+          .match(/[a-z][a-z0-9-]{3,}/g) || []
+      ).filter(Boolean),
+    ),
+  ].filter((term) => !stopwords.has(term));
+}
+
+function rotate(list, offset) {
+  if (!list.length) return list;
+  const shift = ((offset % list.length) + list.length) % list.length;
+  return [...list.slice(shift), ...list.slice(0, shift)];
+}
+
+function distinctOptions(correct, candidates, limit) {
+  const options = [];
+  for (const candidate of candidates) {
+    if (options.length >= limit) break;
+    if (candidate === correct) continue;
+    if (candidate.includes(correct) || correct.includes(candidate)) continue;
+    if (options.some((option) => option.includes(candidate) || candidate.includes(option)))
+      continue;
+    options.push(candidate);
+  }
+  return options;
+}
+
+/**
+ * Builds grounded practice questions from authorized source context.
+ * MCQs use distinctive terms drawn from the material as the single correct answer with plausible
+ * distractors from the same material; generic options are only a last-resort fallback.
+ */
+export function makeQuestions(context, count, viva = false) {
+  const sentences = String(context || "")
     .split(/[.!?]+/)
     .map((item) => item.trim())
-    .filter(Boolean);
-  return Array.from({ length: count }, (_, index) => ({
-    question: sentences[index]
-      ? `Explain this concept: ${sentences[index].slice(0, 100)}?`
-      : "What is the most important idea in this topic?",
-    options: [
-      "Review the source material",
-      "Ignore the topic",
-      "Use an unrelated answer",
-      "There is not enough evidence",
-    ],
-    answer: "Review the source material",
-  }));
+    .filter((item) => item.length > 20);
+  const termPool = [...new Set(sentences.flatMap((sentence) => keyTerms(sentence)))];
+
+  return Array.from({ length: count }, (_, index) => {
+    const sentence = sentences[index];
+    if (!sentence) {
+      return {
+        question: "What is the most important idea in this topic?",
+        ...(viva
+          ? { answer: "The authorized study material does not contain enough evidence." }
+          : {
+              options: rotate([insufficientEvidence, ...genericDistractors], index),
+              answer: insufficientEvidence,
+            }),
+      };
+    }
+    if (viva) {
+      return { question: `Explain this concept: ${sentence.slice(0, 100)}?`, answer: sentence };
+    }
+
+    const terms = keyTerms(sentence);
+    const correct = terms.length ? terms[index % terms.length] : null;
+    if (!correct) {
+      return {
+        question: `Which statement matches the study material: "${sentence.slice(0, 120)}"?`,
+        options: rotate([sentence.slice(0, 120), ...genericDistractors], index),
+        answer: sentence.slice(0, 120),
+      };
+    }
+    const distractors = distinctOptions(correct, rotate(termPool, index + 1), 3);
+    const options = rotate(
+      [correct, ...distractors, ...genericDistractors.slice(0, 3 - distractors.length)],
+      index,
+    );
+    return {
+      question: `In the study material, which term best completes: "${sentence
+        .slice(0, 160)
+        .replace(new RegExp(`\\b${escapeRegExp(correct)}\\b`, "i"), "_____")}"?`,
+      options,
+      answer: correct,
+    };
+  });
 }
 
 export function runStudyAgent(input, research) {
@@ -83,7 +232,7 @@ export function runStudyAgent(input, research) {
 export function runQuizAgent(input, research) {
   const context = research.context.map((match) => match.text).join(" ");
   return {
-    questions: makeQuestions(context, input.kind === "viva" ? 5 : 3),
+    questions: makeQuestions(context, input.kind === "viva" ? 5 : 3, input.kind === "viva"),
     grounded: Boolean(context),
     sources: research.sources,
     handoff: handoff(
@@ -127,6 +276,41 @@ export function runQaAgent(result, review) {
   return { passed: failures.length === 0, failures };
 }
 
+function groundedProviderMessage(route, input, research) {
+  const sourceContext = research.context
+    .map(
+      (match, index) =>
+        `[Source ${index + 1} | document ${match.documentId} | chunk ${match.id}]\n${match.text}`,
+    )
+    .join("\n\n");
+  return [
+    "You are the StudyForge study-only agent. Answer only academic study questions.",
+    "Use only the authorized source context below. If it does not support the question, say that the uploaded material does not contain enough evidence.",
+    "Do not use outside knowledge to fill gaps. Do not emit provider-specific citation markers; StudyForge will attach the verified source references.",
+    ...(route === "mcq" || route === "viva"
+      ? []
+      : [
+          "Write a concise, student-friendly Markdown response.",
+          "Use a short paragraph or a useful Markdown heading when appropriate.",
+          "When the answer naturally contains multiple items, use a real Markdown list with one item per line (numbered for ordered steps or points, bullets for unordered items). Do not write list items inline in one paragraph.",
+          "Use short paragraphs and line breaks for readability. Keep every claim grounded in the authorized source context.",
+          "Do not add inline source labels, grouped source citations, or citation brackets; StudyForge renders the verified EVIDENCE section separately.",
+        ]),
+    `Requested operation: ${route}.`,
+    ...(route === "mcq"
+      ? [
+          'Return only valid JSON in the shape {"questions":[{"question":"...","options":["..."],"answer":"..."}]}.',
+        ]
+      : route === "viva"
+        ? [
+            'Return only valid JSON in the shape {"questions":[{"question":"...","answer":"..."}]}. Each question must be open-ended and require the student to explain the answer; do not include options.',
+          ]
+        : []),
+    `User request: ${input.question || input.topic || ""}`,
+    `Authorized source context:\n${sourceContext || "[No authorized source context found.]"}`,
+  ].join("\n");
+}
+
 export async function orchestrate(kind, input, store, options = {}) {
   const route = routes[kind] ? kind : "assistant";
   const provider = options.provider || createFoundryProvider();
@@ -134,31 +318,24 @@ export async function orchestrate(kind, input, store, options = {}) {
   let result;
   let research = { context: [], sources: [], grounded: false };
   if (selected.includes("rag")) research = await runRagAgent(input, store);
-  if (provider.configured && route !== "progress") {
+  if (route === "assistant" && !research.context.length) {
+    result = { ...groundedAnswer(input.question, research.context), sources: research.sources };
+  } else if (provider.configured && route !== "progress") {
     const generated = await provider.run({
-      message: [
-        "You are the StudyForge study-only agent. Answer only academic study questions.",
-        "Use the connected knowledge base for grounding. If the material does not support the question, say so.",
-        `Requested operation: ${route}.`,
-        ...(route === "mcq" || route === "viva"
-          ? [
-              'Return only valid JSON in the shape {"questions":[{"question":"...","options":["..."],"answer":"..."}]}.',
-            ]
-          : []),
-        `User request: ${input.question || input.topic || ""}`,
-      ].join("\n"),
+      message: groundedProviderMessage(route, input, research),
     });
+    const verifiedSources = research.sources;
     if (route === "assistant") {
       result = {
-        answer: generated.answer,
-        grounded: generated.sources.length > 0,
-        sources: generated.sources,
+        answer: cleanGeneratedAnswer(generated.answer),
+        grounded: verifiedSources.length > 0,
+        sources: verifiedSources,
       };
     } else if (route === "summary" || route === "explanation") {
       result = {
-        summary: generated.answer,
-        grounded: generated.sources.length > 0,
-        sources: generated.sources,
+        summary: cleanGeneratedAnswer(generated.answer),
+        grounded: verifiedSources.length > 0,
+        sources: verifiedSources,
       };
     } else {
       let questions;
@@ -170,8 +347,8 @@ export async function orchestrate(kind, input, store, options = {}) {
       }
       result = {
         questions: Array.isArray(questions) ? questions : [],
-        grounded: generated.sources.length > 0,
-        sources: generated.sources,
+        grounded: verifiedSources.length > 0,
+        sources: verifiedSources,
       };
     }
   } else if (route === "assistant") {

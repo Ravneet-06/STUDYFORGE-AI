@@ -30,7 +30,7 @@ The current vertical slice runs from one Node.js HTTP process. It serves the bro
 
 ### Frontend
 
-The web client owns navigation, accessible forms, upload progress, assistant conversations, quiz interactions, study plans, progress, analytics, and explicit loading/error/empty/success states. It calls versioned backend APIs and receives only user-authorized data.
+The web client owns navigation, accessible forms, upload progress, assistant conversations, quiz interactions, study plans, persisted progress, and explicit loading/error/empty/success states. It calls versioned backend APIs and receives only user-authorized data.
 
 ### Backend API
 
@@ -64,7 +64,7 @@ Agent handoffs carry a typed task envelope containing task ID, user ID, allowed 
 
 ### MCP/tool gateway
 
-MCP tools are explicit, schema-validated capabilities. The implemented local allowlist contains only `list_documents`, `get_document_chunks`, and `record_progress`, all scoped to the authenticated user. Project-management/GitHub, general database administration, evaluation, destructive, and privileged tool families are planned boundaries only and are not exposed by this MVP. Implemented tools have ownership checks, input limits, and audit logging; execution timeouts and edge rate limiting remain production follow-up requirements.
+MCP tools are explicit, schema-validated capabilities. The implemented local allowlist contains `list_documents`, `get_document_chunks`, `record_progress`, and `record_activity`, all scoped to the authenticated user. `record_activity` cannot create MCQ or Viva attempts; those require their server-side assessment workflows. Project-management/GitHub, general database administration, evaluation, destructive, and privileged tool families are planned boundaries only and are not exposed by this MVP. Implemented tools have ownership checks, input limits, and audit logging; execution timeouts and edge rate limiting remain production follow-up requirements.
 
 ## Required agents
 
@@ -100,4 +100,14 @@ The MVP should use separate frontend and backend deployables, a worker path for 
 
 ## Current agent routing
 
-The local orchestrator routes requests through the RAG/Research, Study, or Quiz specialist as needed, then applies Reviewer and QA checks before returning a structured response. The Foundry provider boundary is explicit: hosted invocation requires authorized project configuration and is never simulated. Security/Guardrail checks run at the API boundary. MCP exposes only authenticated, schema-validated document and progress tools; unknown or privileged tools are denied by default.
+The local orchestrator routes requests through the RAG/Research, Study, or Quiz specialist as needed, then applies Reviewer and QA checks before returning a structured response. The Foundry provider boundary is explicit: hosted invocation requires authorized project configuration and is never simulated. Security/Guardrail checks run at the API boundary. MCP exposes only authenticated, schema-validated document, progress, and activity tools; unknown or privileged tools are denied by default.
+
+## Implemented progress and assessment model
+
+- `apps/api/src/progress.mjs` owns the cumulative progress model. MCQ scores are graded by the API against the authenticated user's stored quiz answers; Viva scores come from the server evaluator. Clients cannot set assessment scores, points, or completion values. The server derives cumulative completion, active days, per-activity averages, weekly sessions, and recent activity.
+- `POST /api/progress` accepts user-editable plan/hour fields only; completion and activity fields remain server-owned. The activity endpoint and MCP tool cannot create MCQ or Viva attempts. MCQ attempts, Viva evaluations, grounded generations, and saved plans record activity through server-side workflows. Migration `0006_progress_activity.sql` adds the counters idempotently and backfills MCQ totals/activity from durable quiz attempt rows.
+- `apps/api/src/viva.mjs` evaluates Viva answers deterministically against the reference answer's concept terms. It returns `correct`, `partial`, or `incorrect` per question with an overall score, a matched-concept explanation, and the reference answer. A non-empty answer is never automatically correct, and reference answers are bounded and never invented.
+
+## Development workflow agents
+
+`apps/api/src/workflow.mjs` implements the orchestrator -> specialist -> reviewer -> QA pipeline over structured, bounded tasks. `runReviewer` refuses to approve a task whose test evidence contains a failure, and `runQaGate` reports `PASS`, `FAIL`, or `BLOCKED` without hiding failures. A task is only `approved` when the reviewer approves and QA passes; otherwise it is `reopened` or `blocked`. `createIssueTracker` is the GitHub integration point and stays read-only unless a write integration is explicitly authorized, so no real issue is created, closed, or deleted automatically.

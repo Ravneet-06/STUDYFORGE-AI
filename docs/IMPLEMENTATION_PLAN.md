@@ -2,7 +2,10 @@
 
 ## Status
 
-This is the initial implementation roadmap for a repository that currently contains no application code. It is a plan, not a claim that the listed features already exist.
+This is the delivery roadmap for the StudyForge AI MVP. Phases 0-7 and the local evaluation harness
+are implemented in this repository as a runnable Node.js + vanilla-JS vertical slice; Phase 8 hosted
+Foundry evaluation remains blocked by zero Azure GPT deployment quota. The plan below describes the
+Issue-driven delivery process, not a claim that every hosted capability exists.
 
 ## Delivery principles
 

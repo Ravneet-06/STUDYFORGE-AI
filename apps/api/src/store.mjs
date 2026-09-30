@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { normalizeProgress } from "./progress.mjs";
 
 const file = join(process.cwd(), ".data", "studyforge.json");
 const empty = {
@@ -10,6 +11,7 @@ const empty = {
   quizzes: [],
   attempts: [],
   plans: [],
+  askHistory: [],
 };
 
 export function createStore() {
@@ -50,7 +52,8 @@ export function createStore() {
       await ready;
       const document = owned(data.documents, uid, id);
       if (!document) return false;
-      document.status = "deleted";
+      data.documents = data.documents.filter((item) => item !== document);
+      data.chunks = data.chunks.filter((item) => item.documentId !== id || item.userId !== uid);
       await persist();
       return true;
     },
@@ -68,23 +71,18 @@ export function createStore() {
     },
     getProgress: async (uid) => {
       await ready;
-      return (
-        data.progress.find((item) => item.userId === uid) || {
-          userId: uid,
-          completed: 0,
-          streak: 0,
-          hours: 0,
-          plan: "Build a consistent 25-minute daily study habit.",
-        }
+      return normalizeProgress(
+        uid,
+        data.progress.find((item) => item.userId === uid),
       );
     },
     updateProgress: async (uid, patch) => {
       await ready;
-      const current = {
+      const current = normalizeProgress(uid, {
         ...data.progress.find((item) => item.userId === uid),
         userId: uid,
         ...patch,
-      };
+      });
       data.progress = data.progress.filter((item) => item.userId !== uid).concat(current);
       await persist();
       return current;
@@ -111,13 +109,80 @@ export function createStore() {
     },
     listPlans: async (uid) => {
       await ready;
-      return data.plans.filter((item) => item.userId === uid);
+      return data.plans
+        .filter((item) => item.userId === uid)
+        .reverse()
+        .sort((left, right) => {
+          const leftDate = left.createdAt || left.created_at || "";
+          const rightDate = right.createdAt || right.created_at || "";
+          return rightDate.localeCompare(leftDate);
+        });
     },
     addPlan: async (plan) => {
       await ready;
-      data.plans.push(plan);
+      const saved = { ...plan, createdAt: plan.createdAt || new Date().toISOString() };
+      data.plans.push(saved);
+      await persist();
+      return saved;
+    },
+    addAskHistory: async (record) => {
+      await ready;
+      const existing = data.askHistory.find(
+        (item) => item.userId === record.userId && item.requestId === record.requestId,
+      );
+      if (existing) return existing;
+      data.askHistory.push(record);
+      await persist();
+      return record;
+    },
+    listAskHistory: async (uid, limit, offset) => {
+      await ready;
+      return data.askHistory
+        .filter((item) => item.userId === uid)
+        .sort(
+          (left, right) =>
+            right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+        )
+        .slice(offset, offset + limit)
+        .map((record) => ({
+          id: record.id,
+          studyPlanId: record.studyPlanId,
+          question: record.question,
+          answer: record.answer,
+          createdAt: record.createdAt,
+          grounded: record.grounded,
+          provider: record.provider,
+          sources: record.sources,
+          requestId: record.requestId,
+        }));
+    },
+    getPlan: async (uid, id) => {
+      await ready;
+      return owned(data.plans, uid, id);
+    },
+    updatePlan: async (uid, id, patch) => {
+      await ready;
+      const plan = owned(data.plans, uid, id);
+      if (!plan) return undefined;
+      Object.assign(plan, patch, { updatedAt: new Date().toISOString() });
       await persist();
       return plan;
+    },
+    deletePlan: async (uid, id) => {
+      await ready;
+      const plan = owned(data.plans, uid, id);
+      if (!plan) return false;
+      data.plans = data.plans.filter((item) => item !== plan);
+      for (const quiz of data.quizzes) {
+        if (quiz.userId === uid && quiz.planId === id) quiz.planId = null;
+      }
+      const progress = data.progress.find((item) => item.userId === uid);
+      if (progress) {
+        if (progress.currentPlanId === id) progress.currentPlanId = null;
+        if (progress.planWeeklyProgress) delete progress.planWeeklyProgress[id];
+      }
+      await persist();
+      return true;
     },
     newId: () => randomUUID(),
   };

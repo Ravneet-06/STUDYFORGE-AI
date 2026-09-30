@@ -4,7 +4,15 @@ StudyForge AI is an autonomous multi-agent AI study platform built with Microsof
 
 ## Project status
 
-The repository now contains a runnable local MVP vertical slice. It includes a responsive study dashboard, document ingestion, local retrieval-augmented answers, summaries, MCQs, viva prompts, progress tracking, guardrails, logical agent routing, MCP tool validation, and a Supabase schema artifact.
+The repository contains a runnable, tested local MVP vertical slice. It includes a responsive study
+dashboard with real persisted metrics, document ingestion (PDF/DOCX/Markdown/text), grounded
+retrieval-augmented answers with evidence, grounded summaries and explanations, grounded MCQs with
+persisted quizzes and attempts, assessed Viva answers with verdicts and reference answers,
+server-derived cumulative progress, study plans, guardrails, logical agent routing,
+MCP tool validation, a Supabase schema with RLS, and a Microsoft Foundry provider boundary.
+
+Every response is grounded in the authenticated user's own material; unsupported questions are
+explicitly refused instead of fabricated.
 
 ## Vision
 
@@ -38,9 +46,31 @@ npm install
 npm start
 ```
 
-Open `http://localhost:4000`. Local mode persists development data under `.data/` and does not require Azure or Supabase credentials. Configure both `SUPABASE_URL` and `SUPABASE_ANON_KEY`, or `AZURE_AI_PROJECT_ENDPOINT`, only when authorized services are available; the application reports their availability without fabricating credentials. Without Supabase values, local JSON mode remains available. The frontend includes the complete dashboard, library, grounded assistant, practice lab, study plans, progress, and local/provider status workflows.
+Open `http://localhost:4000`. `npm start` runs the local JSON-persistence mode and does not read
+`.env.local`; use `npm run dev` when you want the configured Supabase and Foundry provider paths
+(the dev script loads `.env.local`). Local data is stored under `.data/` and is ignored by Git.
+Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY`, or `AZURE_AI_PROJECT_ENDPOINT` and
+`AZURE_AI_AGENT_NAME`, only when authorized services are available; the application reports their
+availability without fabricating credentials. The frontend includes the complete dashboard, library,
+grounded assistant, practice lab with MCQ and Viva assessment, study plans, progress, and
+local/provider status workflows.
 
-Hosted Foundry is currently blocked by zero GPT deployment quota in the Azure for Students subscription; see [environment notes](docs/ENVIRONMENT.md).
+Quality gates:
+
+```powershell
+npm run test:unit        # Vitest unit and API integration suite
+npm run test:e2e         # Deterministic end-to-end student workflow
+npm run evaluate:local   # Local release-readiness evaluation harness
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+npm run security:check
+```
+
+Hosted Foundry is currently blocked by zero GPT deployment quota in the Azure for Students
+subscription; the live Foundry test is reported as skipped rather than failed. See
+[environment notes](docs/ENVIRONMENT.md).
 
 ## License
 

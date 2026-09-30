@@ -37,6 +37,94 @@ describe("StudyForge MVP API", () => {
     expect(a.body.grounded).toBe(true);
     expect(a.body.sources.length).toBeGreaterThan(0);
   });
+  it("accepts base64-encoded file uploads", async () => {
+    const d = await call("/api/documents", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Uploaded notes",
+        name: "notes.txt",
+        type: "text/plain",
+        data: Buffer.from("Base64 file content for ingestion.").toString("base64"),
+      }),
+    });
+    expect(d.status).toBe(201);
+    expect(d.body.document.size).toBeGreaterThan(0);
+  });
+  it("allows an owner to view document metadata, extracted content, and chunks", async () => {
+    const d = await call("/api/documents", {
+      method: "POST",
+      headers: { "x-studyforge-user": "view-owner" },
+      body: JSON.stringify({ title: "Owned notes", content: "A useful extracted passage." }),
+    });
+    const detail = await call(`/api/documents/${d.body.document.id}`, {
+      headers: { "x-studyforge-user": "view-owner" },
+    });
+    expect(detail.status).toBe(200);
+    expect(detail.body.document).toMatchObject({
+      title: "Owned notes",
+      type: "text/plain",
+      status: "ready",
+      content: "A useful extracted passage.",
+      characterCount: 27,
+    });
+  });
+  it("denies unauthorized document viewing and deletion", async () => {
+    const d = await call("/api/documents", {
+      method: "POST",
+      headers: { "x-studyforge-user": "access-owner" },
+      body: JSON.stringify({ title: "Private notes", content: "Owner-only content." }),
+    });
+    const id = d.body.document.id;
+    expect(
+      (await call(`/api/documents/${id}`, { headers: { "x-studyforge-user": "other" } })).status,
+    ).toBe(404);
+    expect(
+      (
+        await call(`/api/documents/${id}`, {
+          method: "DELETE",
+          headers: { "x-studyforge-user": "other" },
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await call(`/api/documents/${id}`, { headers: { "x-studyforge-user": "access-owner" } }))
+        .body.document.title,
+    ).toBe("Private notes");
+  });
+  it("deletes an owned document and its associated chunks, leaving an empty library", async () => {
+    const d = await call("/api/documents", {
+      method: "POST",
+      headers: { "x-studyforge-user": "delete-owner" },
+      body: JSON.stringify({
+        title: "Disposable notes",
+        content: "This indexed content must be removed.",
+      }),
+    });
+    const id = d.body.document.id;
+    expect(
+      (
+        await call(`/api/documents/${id}/chunks`, {
+          headers: { "x-studyforge-user": "delete-owner" },
+        })
+      ).body.chunks,
+    ).not.toHaveLength(0);
+    expect(
+      (
+        await call(`/api/documents/${id}`, {
+          method: "DELETE",
+          headers: { "x-studyforge-user": "delete-owner" },
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await call("/api/documents", { headers: { "x-studyforge-user": "delete-owner" } })).body
+        .documents,
+    ).toEqual([]);
+    expect(
+      (await call(`/api/documents/${id}`, { headers: { "x-studyforge-user": "delete-owner" } }))
+        .status,
+    ).toBe(404);
+  });
   it("refuses injection patterns", async () => {
     const r = await call("/api/assistant", {
       method: "POST",

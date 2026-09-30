@@ -1,6 +1,7 @@
 import { ApiError } from "./contracts.mjs";
 import { validateToolArgument } from "./guardrails.mjs";
 import { logEvent } from "./observability.mjs";
+import { ACTIVITY_TYPES, applyActivity } from "./progress.mjs";
 
 const tools = Object.freeze({
   list_documents: {
@@ -19,18 +20,41 @@ const tools = Object.freeze({
     }),
   },
   record_progress: {
-    fields: ["completed"],
-    description: "Record bounded study progress for the current user.",
+    fields: ["plan"],
+    description: "Save a study focus note without changing server-derived progress metrics.",
     execute: async ({ store, userId, input }) => {
-      const completed = Number(input.completed);
-      if (!Number.isInteger(completed) || completed < 0 || completed > 100) {
+      if (typeof input.plan !== "string" || input.plan.length > 300) {
         throw new ApiError(
           422,
           "invalid_tool_input",
-          "completed must be an integer from 0 to 100.",
+          "plan must be text of at most 300 characters.",
         );
       }
-      return { progress: await store.updateProgress(userId, { completed }) };
+      return { progress: await store.updateProgress(userId, { plan: input.plan }) };
+    },
+  },
+  record_activity: {
+    fields: ["type"],
+    optional: ["score"],
+    description: "Record a confirmed learning activity; the server derives progress points.",
+    execute: async ({ store, userId, input }) => {
+      const type = validateToolArgument(input.type, "type", 40);
+      if (
+        !ACTIVITY_TYPES.includes(type) ||
+        type === "quiz_attempt" ||
+        type === "viva_attempt" ||
+        type === "study_generation"
+      ) {
+        throw new ApiError(
+          422,
+          "invalid_tool_input",
+          "Learning activity must be recorded by its server-side workflow.",
+        );
+      }
+      const current = await store.getProgress(userId);
+      const { patch, progress } = applyActivity(current, { type, score: input.score });
+      await store.updateProgress(userId, patch);
+      return { progress };
     },
   },
 });
@@ -38,9 +62,10 @@ const tools = Object.freeze({
 export function validateToolInput(input) {
   if (!input?.tool || !tools[input.tool]) return { allowed: false, error: "Unknown tool." };
   const definition = tools[input.tool];
+  const optional = definition.optional || [];
   const args = input.input && typeof input.input === "object" ? input.input : input;
   const extras = Object.keys(args).filter(
-    (key) => !definition.fields.includes(key) && key !== "tool",
+    (key) => !definition.fields.includes(key) && !optional.includes(key) && key !== "tool",
   );
   if (extras.length) return { allowed: false, error: "Unexpected tool arguments." };
   const missing = definition.fields.filter((field) => args[field] === undefined);
@@ -66,6 +91,7 @@ export function listTools() {
   return Object.entries(tools).map(([name, value]) => ({
     name,
     fields: value.fields,
+    optional: value.optional || [],
     description: value.description,
   }));
 }

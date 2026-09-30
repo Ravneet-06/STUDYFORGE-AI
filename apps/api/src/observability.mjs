@@ -31,8 +31,10 @@ export function safeError(error) {
     status: Number.isInteger(error?.status) ? error.status : 500,
     code: typeof error?.code === "string" ? error.code : "request_failed",
     message:
-      error?.status && error.status < 500 && typeof error.message === "string"
-        ? error.message
-        : "Request failed.",
+      typeof error?.publicMessage === "string"
+        ? error.publicMessage
+        : error?.status && error.status < 500 && typeof error.message === "string"
+          ? error.message
+          : "Request failed.",
   };
 }

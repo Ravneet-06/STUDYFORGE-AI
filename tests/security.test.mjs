@@ -91,7 +91,7 @@ describe("security and guardrails", () => {
     const response = await fetch(`${base}/api/documents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "x", content: "x".repeat(2_100_000) }),
+      body: JSON.stringify({ title: "x", content: "x".repeat(12_100_000) }),
     });
     expect(response.status).toBe(413);
     expect(await response.text()).not.toContain("secret");

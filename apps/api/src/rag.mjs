@@ -52,7 +52,7 @@ export async function extractText(input) {
   const type = inputType(input);
   const buffer = inputBuffer(input);
   if (buffer.length > LIMITS.documentBytes)
-    throw new ApiError(413, "payload_too_large", "Document exceeds the 1.5 MB limit.");
+    throw new ApiError(413, "payload_too_large", "Document exceeds the 8 MB limit.");
   if (!buffer.length) throw new ApiError(422, "empty_document", "Document is empty.");
   let text;
   if (type === "pdf") {
@@ -142,6 +142,8 @@ export async function ingestDocument(store, uid, input) {
     ),
     type: extracted.mimeType,
     size: extracted.byteSize,
+    characterCount: extracted.text.length,
+    content: extracted.text,
     createdAt: new Date().toISOString(),
     status: "ready",
     embeddingProvider: embeddingConfig() ? "azure-openai" : "none",
@@ -156,7 +158,7 @@ export async function ingestDocument(store, uid, input) {
       index,
       text,
       embedding: config ? await createEmbedding(text, config) : null,
-      keywords: [...new Set(text.toLowerCase().match(/[a-z0-9]{4,}/g) || [])],
+      keywords: [...new Set(text.toLowerCase().match(/[a-z0-9]{3,}/g) || [])],
     });
   }
   await store.addDocument(document, chunks);
@@ -170,37 +172,128 @@ export async function ingestDocument(store, uid, input) {
 }
 
 function score(question, chunk) {
-  const terms = new Set(question.toLowerCase().match(/[a-z0-9]{3,}/g) || []);
-  return chunk.keywords.filter((word) => terms.has(word)).length;
+  const stopwords = new Set([
+    "about",
+    "above",
+    "after",
+    "again",
+    "also",
+    "because",
+    "before",
+    "being",
+    "between",
+    "could",
+    "does",
+    "doing",
+    "each",
+    "from",
+    "have",
+    "into",
+    "more",
+    "most",
+    "other",
+    "same",
+    "some",
+    "such",
+    "than",
+    "that",
+    "their",
+    "them",
+    "then",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "under",
+    "very",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "with",
+    "would",
+    "your",
+    "the",
+    "and",
+    "for",
+    "are",
+    "was",
+    "were",
+    "has",
+    "had",
+    "can",
+    "not",
+    "but",
+    "you",
+    "our",
+    "its",
+    "all",
+    "any",
+    "how",
+    "why",
+    "who",
+  ]);
+  const terms = new Set(
+    (question.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter((word) => !stopwords.has(word)),
+  );
+  const keywords = new Set([
+    ...(Array.isArray(chunk.keywords) ? chunk.keywords : []),
+    ...(String(chunk.text || "")
+      .toLowerCase()
+      .match(/[a-z0-9]{3,}/g) || []),
+  ]);
+  return [...keywords].filter((word) => terms.has(word) && !stopwords.has(word)).length;
 }
 
 export async function retrieve(store, uid, question, documentId) {
-  if (documentId && store.getDocument && !(await store.getDocument(uid, documentId))) {
-    logEvent("retrieval.authorization_denied", { userId: uid, documentId });
-    return [];
-  }
-  const config = embeddingConfig();
-  if (config && store.semanticSearch) {
-    const vector = await createEmbedding(question, config);
-    const semantic = guardContext(
-      (await store.semanticSearch(uid, vector, documentId))
-        .filter((chunk) => chunk.userId === uid && (!documentId || chunk.documentId === documentId))
+  try {
+    if (documentId && store.getDocument && !(await store.getDocument(uid, documentId))) {
+      logEvent("retrieval.authorization_denied", { userId: uid, documentId });
+      throw new ApiError(404, "not_found", "Document not found.");
+    }
+    const config = embeddingConfig();
+    if (config && store.semanticSearch) {
+      const vector = await createEmbedding(question, config);
+      const semantic = guardContext(
+        (await store.semanticSearch(uid, vector, documentId))
+          .filter(
+            (chunk) => chunk.userId === uid && (!documentId || chunk.documentId === documentId),
+          )
+          .slice(0, 5),
+      );
+      if (semantic.length) {
+        logEvent("retrieval.completed", { userId: uid, documentId, matchCount: semantic.length });
+        return semantic;
+      }
+    }
+    const lexical = guardContext(
+      (await store.getChunks(uid, documentId))
+        .map((chunk) => ({ ...chunk, score: score(question, chunk) }))
+        .filter((chunk) => chunk.score > 0)
+        .sort((a, b) => b.score - a.score)
         .slice(0, 5),
     );
-    if (semantic.length) {
-      logEvent("retrieval.completed", { userId: uid, documentId, matchCount: semantic.length });
-      return semantic;
-    }
+    logEvent("retrieval.completed", { userId: uid, documentId, matchCount: lexical.length });
+    return lexical;
+  } catch (cause) {
+    if (cause instanceof ApiError) throw cause;
+    logEvent("retrieval.failed", {
+      userId: uid,
+      documentId,
+      code: typeof cause?.code === "string" ? cause.code : undefined,
+    });
+    const error = new ApiError(
+      503,
+      "retrieval_unavailable",
+      "Study material search is temporarily unavailable. Please try again.",
+    );
+    error.publicMessage = error.message;
+    error.cause = cause;
+    throw error;
   }
-  const lexical = guardContext(
-    (await store.getChunks(uid, documentId))
-      .map((chunk) => ({ ...chunk, score: score(question, chunk) }))
-      .filter((chunk) => chunk.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5),
-  );
-  logEvent("retrieval.completed", { userId: uid, documentId, matchCount: lexical.length });
-  return lexical;
 }
 
 export function groundedAnswer(question, matches) {

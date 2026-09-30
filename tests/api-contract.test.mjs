@@ -45,9 +45,9 @@ describe("backend API contracts", () => {
     const progress = await call("/api/progress", {
       method: "POST",
       headers,
-      body: JSON.stringify({ completed: 50, streak: 2, hours: 1.5 }),
+      body: JSON.stringify({ completed: 50, hours: 1.5 }),
     });
-    expect(progress.body.progress.completed).toBe(50);
+    expect(progress.response.status).toBe(422);
 
     const quiz = await call("/api/quizzes", {
       method: "POST",
@@ -61,7 +61,7 @@ describe("backend API contracts", () => {
     const attempt = await call(`/api/quizzes/${quiz.body.quiz.id}/attempts`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ score: 100, answers: { 0: "Protons" } }),
+      body: JSON.stringify({ score: 0, answers: { 0: "0" } }),
     });
     expect(attempt.response.status).toBe(201);
 

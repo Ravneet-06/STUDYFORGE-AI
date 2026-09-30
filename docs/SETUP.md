@@ -2,17 +2,18 @@
 
 ## Selected MVP toolchain
 
-| Area                   | Foundation choice                                 | Current status                               |
-| ---------------------- | ------------------------------------------------- | -------------------------------------------- |
-| Workspace              | npm workspaces on Node.js 22+                     | Configured                                   |
-| Frontend               | Next.js with TypeScript                           | Selected for Phase 5                         |
-| Backend API            | TypeScript service with Fastify                   | Selected for Phase 2                         |
-| Ingestion worker       | TypeScript worker process                         | Selected for Phase 3                         |
-| Unit/integration tests | Vitest                                            | Selected for implementation phases           |
-| Browser tests          | Playwright                                        | Selected for the QA phase                    |
-| Data and auth          | Supabase Auth and Postgres with RLS               | Requires a user-authorized project           |
-| AI platform            | Microsoft Foundry and supported `azd` workflows   | Local tooling verified; no resources created |
-| Retrieval              | Provider interface, initially Supabase `pgvector` | Requires the data phase                      |
+| Area                   | Implemented MVP stack                           | Current status                                                      |
+| ---------------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| Workspace              | npm workspaces on Node.js 22+                   | Configured                                                          |
+| Frontend               | Static HTML/CSS/JS ES modules served by the API | Implemented                                                         |
+| Backend API            | Dependency-light Node.js HTTP server            | Implemented                                                         |
+| Ingestion              | In-process extraction, chunking, retrieval      | Implemented                                                         |
+| Unit/integration tests | Vitest                                          | Implemented                                                         |
+| End-to-end regression  | Deterministic local workflow test (`test:e2e`)  | Implemented                                                         |
+| Browser automation     | Playwright                                      | Not added; manual browser checklist used                            |
+| Data and auth          | Supabase Auth and Postgres with RLS             | Schema and client implemented; needs an authorized project          |
+| AI platform            | Microsoft Foundry and supported `azd` workflows | Provider boundary implemented; live calls blocked by zero GPT quota |
+| Retrieval              | Supabase `pgvector` RPC with lexical fallback   | Implemented with provider interface                                 |
 
 The MVP runtime is a dependency-light Node.js HTTP server with a static browser client. It does not create Azure or Supabase resources.
 
@@ -33,6 +34,7 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm run test:unit
+npm run test:e2e
 npm run evaluate:local
 npm run security:check
 npm run build
@@ -60,6 +62,12 @@ The foundation CI workflow installs the lockfile and runs all five quality-check
 npm start
 ```
 
-Open `http://localhost:4000`. Local data is stored in `.data/` and is ignored by Git. Upload text or Markdown directly, paste notes, ask grounded questions, and generate study material from matching chunks.
+Open `http://localhost:4000`. `npm start` runs local JSON persistence and does **not** load
+`.env.local`; use `npm run dev` to load `.env.local` and exercise the Supabase and Foundry provider
+paths. Local data is stored in `.data/` and is ignored by Git. Upload text, Markdown, PDF, or DOCX
+material, or paste notes, then ask grounded questions and generate summaries, explanations, MCQs, and
+Viva practice.
 
-PDF-like text can be pasted or supplied as extracted text in local mode. Production PDF/DOCX extraction, Supabase persistence, and Foundry model generation require the corresponding authorized provider work.
+PDF and DOCX extraction is implemented in-process (`pdf-parse` and `mammoth`) and requires no
+external service. Supabase persistence, Azure OpenAI embeddings, and Foundry model generation
+activate only when their authorized provider values are configured.
