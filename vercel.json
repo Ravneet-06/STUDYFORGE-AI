@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.mjs": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.mjs"
+    }
+  ]
+}

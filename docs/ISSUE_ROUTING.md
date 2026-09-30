@@ -26,11 +26,33 @@ retention is seven days.
 The manifest includes untrusted Issue text and follows the repository's artifact access controls;
 do not put secrets in Issue titles or bodies.
 
+## Stage 3: read-only QA agent
+
+The `Issue QA agent` workflow listens for Issue opened, reopened, and responsible-agent label events.
+It runs only when the current Issue labels classify as exactly one recognized `agent:qa` assignment.
+It computes Stage 2's deterministic job ID, waits for that exact non-expired Stage 2 manifest artifact,
+and verifies the manifest and Issue identity before running checks. This artifact handoff also handles
+Stage 2 retries where the matching artifact belongs to an earlier workflow run.
+
+The QA check runner uses a fixed allowlist: `npm run validate:foundation`, `npm run format:check`,
+`npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build`, and
+`npm run security:check`. `npm ci` is used only to install the locked dependencies before those checks.
+Issue title and body are never passed as commands; the title is escaped when included as report data.
+The structured comment identifies the Issue, repository, tested commit, timestamp, QA role, overall
+status, and separate passed, failed, skipped, and execution-error sections with concise output.
+Reports include a deterministic marker derived from the Stage 2 job ID, and existing bot-authored
+markers suppress repeat reports.
+
+The QA job grants `contents: read`, `actions: read` to locate/download the Stage 2 artifact, and
+`issues: write` to post the report. It has no repository contents write permission and does not modify,
+commit, push, approve, merge, or close anything. It does not invoke an AI/model/agent. Later specialized
+agents will need separate workflows and explicit permission boundaries; this Stage 3 workflow does
+not enable code-writing agents.
+
 ## Deliberate limits and future integration
 
 Stage 2 does not invoke AI or any external agent, modify application source, approve/assign/close/merge
 Issues, create secrets, or execute commands from Issue content. The manifest is a handoff contract
-only; `ready_for_agent_execution` does not mean work has begun. A future executor must be a separate
-Stage 3 workflow that consumes the validated manifest, treats its title/body as data, uses separate
-explicit authorization and narrowly scoped permissions, and records its own audit/result without
-granting this preparation workflow repository write access.
+only; `ready_for_agent_execution` does not mean work has begun. Stage 3 is a read-only validator only.
+Any later executor must use a separate workflow, explicit authorization, and narrowly scoped
+permissions; no code-writing agent is enabled here.

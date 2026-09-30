@@ -1,5 +1,5 @@
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+// import { PDFParse } from "pdf-parse";
 import { randomUUID } from "node:crypto";
 import { createEmbedding, embeddingConfig } from "./embeddings.mjs";
 import { ApiError } from "./contracts.mjs";
@@ -56,16 +56,17 @@ export async function extractText(input) {
   if (!buffer.length) throw new ApiError(422, "empty_document", "Document is empty.");
   let text;
   if (type === "pdf") {
-    let parser;
-    try {
-      parser = new PDFParse({ data: buffer });
-      text = (await parser.getText()).text;
-    } catch {
-      throw new ApiError(422, "invalid_file", "PDF could not be parsed.");
-    } finally {
-      await parser?.destroy();
-    }
-  } else if (type === "docx") {
+  let parser;
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    parser = new PDFParse({ data: buffer });
+    text = (await parser.getText()).text;
+  } catch {
+    throw new ApiError(422, "invalid_file", "PDF could not be parsed.");
+  } finally {
+    await parser?.destroy();
+  }
+} else if (type === "docx") {
     try {
       text = (await mammoth.extractRawText({ buffer })).value;
     } catch {

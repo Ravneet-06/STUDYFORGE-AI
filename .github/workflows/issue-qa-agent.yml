@@ -1,0 +1,221 @@
+name: Issue QA agent
+
+on:
+  issues:
+    types: [opened, reopened, labeled]
+
+permissions: {}
+
+concurrency:
+  group: issue-qa-${{ github.event.issue.updated_at }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    if: github.event.action != 'labeled' || startsWith(github.event.label.name, 'agent:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Check out the Stage 2 source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Prepare QA artifact lookup
+        id: prepare
+        uses: actions/github-script@v7
+        timeout-minutes: 7
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const fs = await import('node:fs/promises');
+            const helperUrl = pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/qa-agent.mjs`);
+            const boundaryUrl = pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/issue-execution-boundary.mjs`);
+            const { classifyQaLabels, createQaReportMarker, findQaArtifact } = await import(helperUrl.href);
+            const { prepareExecutionBoundary } = await import(boundaryUrl.href);
+            const { owner, repo, number } = context.issue;
+            const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number });
+            const assignment = classifyQaLabels(issue.labels);
+            if (assignment.status !== 'routed' || assignment.label !== 'agent:qa') {
+              core.setOutput('eligible', 'false');
+              core.info(`QA execution skipped: responsible labels classified as ${assignment.status}${assignment.label ? ` (${assignment.label})` : ''}.`);
+              return;
+            }
+
+            const triggerLabel = context.payload.label?.name || '';
+            const timestamp = context.payload.issue.updated_at;
+            const boundary = prepareExecutionBoundary({
+              repository: `${owner}/${repo}`,
+              issue,
+              eventAction: context.payload.action,
+              timestamp,
+              triggerLabel,
+            });
+            if (!boundary.manifest || boundary.assignment.label !== 'agent:qa') {
+              core.setOutput('eligible', 'false');
+              core.warning('Stage 2 did not produce a valid QA execution manifest identity.');
+              return;
+            }
+
+            const marker = createQaReportMarker(boundary.jobId);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            const { hasQaReport } = await import(helperUrl.href);
+            if (hasQaReport(comments, marker)) {
+              core.setOutput('eligible', 'false');
+              core.info('A QA report already exists for this Issue event.');
+              return;
+            }
+
+            const artifactName = `studyforge-issue-job-${boundary.jobId}`;
+            let artifact = null;
+            for (let attempt = 0; attempt < 60 && !artifact; attempt += 1) {
+              for (let page = 1; !artifact; page += 1) {
+                const { data } = await github.rest.actions.listArtifactsForRepo({
+                  owner,
+                  repo,
+                  per_page: 100,
+                  page,
+                });
+                artifact = findQaArtifact(data.artifacts, artifactName);
+                if (artifact || data.artifacts.length < 100) break;
+              }
+              if (!artifact && attempt < 59) await new Promise((resolve) => setTimeout(resolve, 5000));
+            }
+            if (!artifact?.workflow_run?.id) {
+              core.setOutput('eligible', 'false');
+              core.warning('No non-expired Stage 2 manifest artifact appeared for this Issue event.');
+              return;
+            }
+
+            const inputPath = `${process.env.RUNNER_TEMP}/studyforge-qa-input.json`;
+            await fs.writeFile(inputPath, `${JSON.stringify({
+              issueNumber: number,
+              issueTitle: issue.title,
+              repository: `${owner}/${repo}`,
+              expectedJobId: boundary.jobId,
+              expectedTimestamp: new Date(timestamp).toISOString(),
+              eventAction: context.payload.action,
+              triggerLabel,
+              inputPath,
+            }, null, 2)}\n`, 'utf8');
+            core.setOutput('eligible', 'true');
+            core.setOutput('job-id', boundary.jobId);
+            core.setOutput('artifact-name', artifactName);
+            core.setOutput('artifact-run-id', String(artifact.workflow_run.id));
+            core.setOutput('marker', marker);
+
+      - name: Download the matching Stage 2 manifest
+        if: steps.prepare.outputs.eligible == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.prepare.outputs.artifact-name }}
+          path: ${{ runner.temp }}/studyforge-qa-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.prepare.outputs.artifact-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify QA manifest and write fixed QA input
+        if: steps.prepare.outputs.eligible == 'true'
+        id: verify
+        uses: actions/github-script@v7
+        env:
+          EXPECTED_JOB_ID: ${{ steps.prepare.outputs.job-id }}
+          EXPECTED_TIMESTAMP: ${{ github.event.issue.updated_at }}
+          TRIGGER_LABEL: ${{ github.event.label.name || '' }}
+          INPUT_PATH: ${{ runner.temp }}/studyforge-qa-input.json
+          ARTIFACT_DIR: ${{ runner.temp }}/studyforge-qa-artifact
+        with:
+          script: |
+            const fs = await import('node:fs/promises');
+            const path = await import('node:path');
+            const { pathToFileURL } = await import('node:url');
+            const helperUrl = pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/qa-agent.mjs`);
+            const { validateQaManifest } = await import(helperUrl.href);
+
+            const files = [];
+            async function visit(directory) {
+              for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+                const fullPath = path.join(directory, entry.name);
+                if (entry.isDirectory()) await visit(fullPath);
+                else if (entry.isFile() && entry.name === 'issue-job-manifest.json') files.push(fullPath);
+              }
+            }
+            await visit(process.env.ARTIFACT_DIR);
+            if (files.length !== 1) throw new Error(`Expected one Stage 2 manifest; found ${files.length}.`);
+            const manifest = JSON.parse(await fs.readFile(files[0], 'utf8'));
+            const payload = validateQaManifest(manifest, `${context.repo.owner}/${context.repo.repo}`);
+            if (manifest.jobId !== process.env.EXPECTED_JOB_ID) throw new Error('Downloaded manifest does not match the deterministic event job ID.');
+            if (payload.issueNumber !== context.issue.number) throw new Error('Manifest Issue number does not match the triggering Issue.');
+            if (payload.eventAction !== context.payload.action) throw new Error('Manifest event action does not match the triggering event.');
+            if (payload.timestamp !== new Date(process.env.EXPECTED_TIMESTAMP).toISOString()) throw new Error('Manifest timestamp does not match the triggering event.');
+            if ((process.env.TRIGGER_LABEL || '') !== (payload.eventAction === 'labeled' ? payload.responsibleAgentLabel : '')) throw new Error('Manifest label does not match the event trigger.');
+
+            const input = JSON.parse(await fs.readFile(process.env.INPUT_PATH, 'utf8'));
+            await fs.writeFile(process.env.INPUT_PATH, `${JSON.stringify({
+              ...input,
+              issueTitle: payload.issueTitle,
+              testedCommit: context.sha,
+              timestamp: payload.timestamp,
+              jobId: manifest.jobId,
+            }, null, 2)}\n`, 'utf8');
+
+      - name: Set up Node.js
+        if: steps.prepare.outputs.eligible == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        if: steps.prepare.outputs.eligible == 'true'
+        id: dependencies
+        continue-on-error: true
+        run: npm ci --no-audit --no-fund
+
+      - name: Run the fixed QA validation allowlist
+        if: steps.prepare.outputs.eligible == 'true'
+        env:
+          STUDYFORGE_QA_INPUT: ${{ runner.temp }}/studyforge-qa-input.json
+          STUDYFORGE_QA_REPORT: ${{ runner.temp }}/studyforge-qa-report.json
+          STUDYFORGE_QA_INSTALL_OUTCOME: ${{ steps.dependencies.outcome }}
+        run: node scripts/run-qa-checks.mjs
+
+      - name: Post structured QA evidence
+        if: steps.prepare.outputs.eligible == 'true'
+        uses: actions/github-script@v7
+        env:
+          REPORT_PATH: ${{ runner.temp }}/studyforge-qa-report.json
+        with:
+          script: |
+            const fs = await import('node:fs/promises');
+            const { pathToFileURL } = await import('node:url');
+            const helperUrl = pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/qa-agent.mjs`);
+            const { formatQaReport, hasQaReport } = await import(helperUrl.href);
+            const report = JSON.parse(await fs.readFile(process.env.REPORT_PATH, 'utf8'));
+            const { owner, repo } = context;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: report.issueNumber,
+              per_page: 100,
+            });
+            if (hasQaReport(comments, report.marker)) {
+              core.info('A QA report already exists for this Issue event.');
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: report.issueNumber,
+              body: formatQaReport(report),
+            });
