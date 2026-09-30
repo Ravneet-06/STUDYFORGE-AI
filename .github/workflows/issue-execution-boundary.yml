@@ -1,0 +1,111 @@
+name: Issue execution boundary
+
+on:
+  issues:
+    types: [opened, reopened, labeled]
+
+permissions: {}
+
+concurrency:
+  group: issue-execution-boundary-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.event.action != 'labeled' || startsWith(github.event.label.name, 'agent:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Check out boundary helper
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate Issue and prepare manifest
+        id: boundary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const fs = await import('node:fs/promises');
+            const helperUrl = pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/issue-execution-boundary.mjs`);
+            const {
+              formatExecutionBoundaryComment,
+              createExecutionArtifactName,
+              hasExecutionArtifact,
+              hasExecutionBoundaryComment,
+              prepareExecutionBoundary,
+            } = await import(helperUrl.href);
+            const { owner, repo, number } = context.issue;
+            const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number });
+            const boundary = prepareExecutionBoundary({
+              repository: `${owner}/${repo}`,
+              issue,
+              eventAction: context.payload.action,
+              timestamp: context.payload.issue.updated_at,
+              triggerLabel: context.payload.label?.name || '',
+            });
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+
+            if (hasExecutionBoundaryComment(comments, boundary.eventMarker)) {
+              core.setOutput('duplicate', 'true');
+              core.info('Execution-boundary output already exists for this Issue event.');
+            } else {
+              core.setOutput('duplicate', 'false');
+              core.setOutput('comment-body', formatExecutionBoundaryComment(boundary));
+              if (boundary.manifest) {
+                await fs.writeFile('issue-job-manifest.json', `${JSON.stringify(boundary.manifest, null, 2)}\n`, 'utf8');
+                core.setOutput('manifest-created', 'true');
+                core.setOutput('job-id', boundary.jobId);
+                const artifactName = createExecutionArtifactName(boundary.jobId);
+                let artifactExists = false;
+                for (let page = 1; !artifactExists; page += 1) {
+                  const { data } = await github.rest.actions.listArtifactsForRepo({
+                    owner,
+                    repo,
+                    per_page: 100,
+                    page,
+                  });
+                  artifactExists = hasExecutionArtifact(data.artifacts, artifactName);
+                  if (artifactExists || data.artifacts.length < 100) break;
+                }
+                core.setOutput('artifact-exists', String(artifactExists));
+              } else {
+                core.setOutput('manifest-created', 'false');
+                core.setOutput('job-id', 'not-created');
+                core.setOutput('artifact-exists', 'false');
+              }
+            }
+
+      - name: Upload validated Issue job manifest
+        if: steps.boundary.outputs.manifest-created == 'true' && steps.boundary.outputs.duplicate != 'true' && steps.boundary.outputs.artifact-exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: studyforge-issue-job-${{ steps.boundary.outputs.job-id }}
+          path: issue-job-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report execution-boundary status
+        if: steps.boundary.outputs.duplicate != 'true'
+        uses: actions/github-script@v7
+        env:
+          BOUNDARY_COMMENT: ${{ steps.boundary.outputs.comment-body }}
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: number,
+              body: process.env.BOUNDARY_COMMENT,
+            });
